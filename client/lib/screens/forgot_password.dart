@@ -1,95 +1,113 @@
 import 'package:flutter/material.dart';
-import 'package:inventify/screens/reset_password.dart';
+import 'signup_screen.dart'; 
 
-class ForgotPasswordScreen extends StatelessWidget {
+class ForgotPasswordScreen extends StatefulWidget {
   const ForgotPasswordScreen({super.key});
 
-  void _sendResetLink(BuildContext context) {
-    // TODO: Implement actual reset link logic
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Reset link sent to your email (placeholder)!')),
-    );
+  @override
+  State<ForgotPasswordScreen> createState() => _ForgotPasswordScreenState();
+}
+
+class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
+  final _formKey = GlobalKey<FormState>();
+  final _emailController = TextEditingController();
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    super.dispose();
   }
 
+  void _onSendLinkPressed() {
+    final isValid = _formKey.currentState?.validate() ?? false;
+    if (!isValid) {
+      return;
+    }
+    // TODO: API call logic here to send the reset link
+    print('Form is valid! Sending reset link to: ${_emailController.text}');
+  }
 
   @override
   Widget build(BuildContext context) {
-    // Use the primary color from the parent application's theme
-    final Color primaryColor = Theme.of(context).colorScheme.primary;
+    final textTheme = Theme.of(context).textTheme;
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Forgot Password'), 
-        centerTitle: true,// Added the title to the AppBar
         backgroundColor: Colors.transparent,
         elevation: 0,
-        // Using `automaticallyImplyLeading: true` will show a back button if available
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            // The large title from the body has been moved to the AppBar.
-            // Removed: // 1. Title Text and SizedBox(height: 12.0)
-
-            // 2. Subtitle/Instructions
-            Center(
-            child:Text(
-              "Enter your email and we'll send you a link to reset your password.",
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 16,
-                color: Colors.grey.shade600,
-                height: 1.5,
-              ),
-            ),
-            ),
-            const SizedBox(height: 40.0),
-
-            // 3. Email Input Field (Styling moved here)
-            const Text(
-              'Email Address',
-               style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
-            ),
-            const SizedBox(height: 8),
-            TextFormField(
-              decoration: InputDecoration(
-                hintText: 'Email Address',
-                prefixIcon: const Icon(Icons.email_outlined),
-                // Custom input field appearance for the design
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12.0),
-                  borderSide: BorderSide.none,
+      // Corrected widget structure
+      body: Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 24.0),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 400),
+            child: Container(
+              padding: const EdgeInsets.all(24.0),
+              decoration: BoxDecoration(
+                border: Border.all(
+                  color: Theme.of(context).dividerColor,
                 ),
-                filled: true,
-                fillColor: Colors.grey.shade100, // Light background
-                contentPadding: const EdgeInsets.symmetric(vertical: 16.0, horizontal: 20.0),
+                borderRadius: BorderRadius.circular(16),
               ),
-            ),
-            const SizedBox(height: 40.0),
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      'Forgot Password?',
+                      textAlign: TextAlign.center,
+                      style: textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Enter your email and we’ll send you a link to reset your password.',
+                      textAlign: TextAlign.center,
+                      style: textTheme.bodyLarge,
+                    ),
+                    const SizedBox(height: 48),
 
-            // 4. Primary Button (Styling moved here)
-            ElevatedButton(
-              onPressed: (){
-               Navigator.of(context).push(
-                            MaterialPageRoute(builder: (context) => const ResetPasswordScreen()),
-                          );},
-              style: ElevatedButton.styleFrom(
-                // Use the primary color from the theme
-                backgroundColor: primaryColor,
-                foregroundColor: Colors.white,
-                // Custom button appearance for the design
-                minimumSize: const Size(double.infinity, 56),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+                    // Email Field
+                    Text('Email Address', style: textTheme.bodySmall),
+                    const SizedBox(height: 8),
+                    TextFormField(
+                      controller: _emailController,
+                      validator: Validators.email,
+                      keyboardType: TextInputType.emailAddress,
+                      decoration: const InputDecoration(
+                        hintText: 'Enter your email',
+                        prefixIcon: Icon(Icons.email_outlined),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    
+                    // Send Reset Link Button
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                      ),
+                      onPressed: _onSendLinkPressed,
+                      child: const Text('Send Reset Link'),
+                    ),
+                    const SizedBox(height: 24),
+                    
+                    // Back to Log In Link
+                    TextButton(
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                      },
+                      style: TextButton.styleFrom(
+                        foregroundColor: Theme.of(context).colorScheme.secondary,
+                      ),
+                      child: const Text('Back to Log In'),
+                    ),
+                  ],
                 ),
-                textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
               ),
-              child: const Text('Send Reset Link'),
             ),
-            const SizedBox(height: 30.0),
-          ],
+          ),
         ),
       ),
     );
