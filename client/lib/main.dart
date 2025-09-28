@@ -16,8 +16,8 @@ class MyApp extends StatelessWidget {
       title: 'Inventify',
       theme: lightTheme,
       darkTheme: darkTheme,
-      themeMode: ThemeMode.system, 
-      home: const LoginScreen(), 
+      themeMode: ThemeMode.system,
+      home: const LoginScreen(), // Start with MainScreen
     );
   }
 }

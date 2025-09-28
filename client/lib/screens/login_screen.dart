@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:inventify/main_screen.dart';
 import 'signup_screen.dart'; 
 import 'forgot_password.dart';
 
@@ -27,6 +28,9 @@ class _LoginScreenState extends State<LoginScreen> {
       return;
     }
     // TODO: Add your API call logic here
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(builder: (context) => const MainScreen()),
+    );
     print('Form is valid! Logging in...');
   }
 
