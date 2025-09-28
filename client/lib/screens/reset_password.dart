@@ -1,111 +1,126 @@
 import 'package:flutter/material.dart';
+import 'signup_screen.dart'; 
 
-class ResetPasswordScreen extends StatelessWidget {
+class ResetPasswordScreen extends StatefulWidget {
   const ResetPasswordScreen({super.key});
 
-  // Simple handler for button press (placeholder)
-  void _sendResetLink(BuildContext context) {
-    // In a real app, validate both fields before calling an API here.
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Password reset successful (placeholder)!')),
-    );
+  @override
+  State<ResetPasswordScreen> createState() => _ResetPasswordScreenState();
+}
+
+class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
+  final _formKey = GlobalKey<FormState>();
+  final _passwordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
+
+  @override
+  void dispose() {
+    _passwordController.dispose();
+    _confirmPasswordController.dispose();
+    super.dispose();
+  }
+
+  void _onResetPressed() {
+    final isValid = _formKey.currentState?.validate() ?? false;
+    if (!isValid) {
+      return;
+    }
+    // TODO: Add your API call logic here to reset the password
+    print('Form is valid! Resetting password...');
   }
 
   @override
   Widget build(BuildContext context) {
-    final Color primaryColor = Theme.of(context).colorScheme.primary;
+    final textTheme = Theme.of(context).textTheme;
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('New Password!'),
-        centerTitle: true,
         backgroundColor: Colors.transparent,
         elevation: 0,
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Center(
-            child:Text(
-              "Enter your password. It should be different from previous password.",
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 16,
-                color: Colors.grey.shade600,
-                height: 1.5,
-              ),
-            ),
-            ),
-            const SizedBox(height: 40.0),
-
-            // --- New Password ---
-            const Text(
-              'New Password',
-              style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
-            ),
-            const SizedBox(height: 8),
-            TextFormField(
-              obscureText: true,
-              decoration: InputDecoration(
-                hintText: 'Enter your new password',
-                prefixIcon: const Icon(Icons.lock_outline),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12.0),
-                  borderSide: BorderSide.none,
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 400),
+          child: Container(
+              padding: const EdgeInsets.all(24.0),
+              decoration: BoxDecoration(
+                border: Border.all(
+                  color: Theme.of(context).dividerColor,
                 ),
-                filled: true,
-                fillColor: Colors.grey.shade100,
-                contentPadding: const EdgeInsets.symmetric(
-                    vertical: 16.0, horizontal: 20.0),
+                borderRadius: BorderRadius.circular(16),
+              ),
+          child: Form(
+            key: _formKey,
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(24.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: <Widget>[
+                  Text(
+                      'Forgot Password?',
+                      textAlign: TextAlign.center,
+                      style: textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 8),
+                  Text(
+                    "Your new password must be different from the previous one.",
+                    textAlign: TextAlign.center,
+                    style: textTheme.bodyLarge,
+                  ),
+                  const SizedBox(height: 40.0),
+
+                  // New Password
+                  Text('New Password', style: textTheme.bodySmall),
+                  const SizedBox(height: 8),
+                  TextFormField(
+                    controller: _passwordController,
+                    validator: Validators.password,
+                    obscureText: true,
+                    decoration: const InputDecoration(
+                      hintText: 'Enter your new password',
+                      prefixIcon: Icon(Icons.lock_outline),
+                    ),
+                  ),
+                  const SizedBox(height: 24.0),
+
+                  // Confirm New Password
+                  Text('Confirm New Password', style: textTheme.bodySmall),
+                  const SizedBox(height: 8),
+                  TextFormField(
+                    controller: _confirmPasswordController,
+                    obscureText: true,
+                    // Validator to check if passwords match
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Please confirm your password';
+                      }
+                      if (value != _passwordController.text) {
+                        return 'Passwords do not match';
+                      }
+                      return null;
+                    },
+                    decoration: const InputDecoration(
+                      hintText: 'Re-enter your new password',
+                      prefixIcon: Icon(Icons.lock_outline),
+                    ),
+                  ),
+                  const SizedBox(height: 40.0),
+
+                  // Button
+                  ElevatedButton(
+                    onPressed: _onResetPressed,
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                    ),
+                    child: const Text('Reset Password'),
+                  ),
+                ],
               ),
             ),
-
-            const SizedBox(height: 24.0),
-
-            // --- Confirm New Password ---
-            const Text(
-              'Confirm New Password',
-              style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
-            ),
-            const SizedBox(height: 8),
-            TextFormField(
-              obscureText: true,
-              decoration: InputDecoration(
-                hintText: 'Re-enter your new password',
-                prefixIcon: const Icon(Icons.lock_outline),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12.0),
-                  borderSide: BorderSide.none,
-                ),
-                filled: true,
-                fillColor: Colors.grey.shade100,
-                contentPadding: const EdgeInsets.symmetric(
-                    vertical: 16.0, horizontal: 20.0),
-              ),
-            ),
-
-            const SizedBox(height: 40.0),
-
-            // --- Button ---
-            ElevatedButton(
-              onPressed: () => _sendResetLink(context),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: primaryColor,
-                foregroundColor: Colors.white,
-                minimumSize: const Size(double.infinity, 56),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                textStyle: const TextStyle(
-                    fontSize: 16, fontWeight: FontWeight.bold),
-              ),
-              child: const Text('Reset Password'),
-            ),
-            const SizedBox(height: 30.0),
-          ],
+          ),
         ),
+      ),
       ),
     );
   }

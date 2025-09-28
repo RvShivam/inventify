@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'signup_screen.dart'; 
-
+import 'reset_password.dart';
 class ForgotPasswordScreen extends StatefulWidget {
   const ForgotPasswordScreen({super.key});
 
@@ -23,7 +23,11 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     if (!isValid) {
       return;
     }
+
     // TODO: API call logic here to send the reset link
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (context) => const ResetPasswordScreen()),
+    );
     print('Form is valid! Sending reset link to: ${_emailController.text}');
   }
 
