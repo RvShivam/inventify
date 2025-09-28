@@ -34,12 +34,14 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final colorScheme = Theme.of(context).colorScheme;
 
     return Scaffold(
       appBar: AppBar(
-        // Transparent app bar for a cleaner look
         backgroundColor: Colors.transparent,
         elevation: 0,
+        // Ensure back button color is correct
+        iconTheme: IconThemeData(color: colorScheme.onBackground),
       ),
       body: Form(
         key: _formKey,
@@ -105,6 +107,9 @@ class _LoginScreenState extends State<LoginScreen> {
               
               // Log In Button
               ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                ),
                 onPressed: _onLoginPressed,
                 child: const Text('Log In'),
               ),
@@ -117,10 +122,13 @@ class _LoginScreenState extends State<LoginScreen> {
                   Text("Don't have an account?", style: textTheme.bodyMedium),
                   TextButton(
                     onPressed: () {
-                      Navigator.of(context).push( MaterialPageRoute(
-                        builder: (context) => const SignupScreen(),
-                      ));
+                      Navigator.of(context).pushReplacement(
+                        MaterialPageRoute(builder: (context) => const SignupScreen()),
+                      );
                     },
+                    style: TextButton.styleFrom(
+                      foregroundColor: Theme.of(context).colorScheme.secondary,
+                    ),
                     child: const Text('Sign Up'),
                   ),
                 ],

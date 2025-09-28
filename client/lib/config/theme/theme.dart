@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+// Light Theme Colors
 const lightColorScheme = ColorScheme(
   brightness: Brightness.light,
   primary: Color(0xFF2A59C3),
@@ -14,6 +15,7 @@ const lightColorScheme = ColorScheme(
   onSurface: Color(0xFF212529),
 );
 
+// Dark Theme Colors
 const darkColorScheme = ColorScheme(
   brightness: Brightness.dark,
   primary: Color(0xFF4C82F7),
@@ -28,6 +30,7 @@ const darkColorScheme = ColorScheme(
   onSurface: Color(0xFFE1E1E1),
 );
 
+// Light ThemeData
 final lightTheme = ThemeData(
   useMaterial3: true,
   colorScheme: lightColorScheme,
@@ -45,7 +48,6 @@ final lightTheme = ThemeData(
       ),
     ),
   ),
-
   inputDecorationTheme: InputDecorationTheme(
     filled: true,
     fillColor: lightColorScheme.surface,
@@ -58,8 +60,13 @@ final lightTheme = ThemeData(
       borderSide: BorderSide(color: lightColorScheme.primary, width: 2.0),
     ),
   ),
+  floatingActionButtonTheme: FloatingActionButtonThemeData(
+    backgroundColor: lightColorScheme.secondary,
+    foregroundColor: lightColorScheme.onSecondary,
+  ),
 );
 
+// Dark ThemeData
 final darkTheme = ThemeData(
   useMaterial3: true,
   colorScheme: darkColorScheme,
@@ -88,5 +95,9 @@ final darkTheme = ThemeData(
       borderRadius: BorderRadius.circular(8),
       borderSide: BorderSide(color: darkColorScheme.primary, width: 2.0),
     ),
+  ),
+  floatingActionButtonTheme: FloatingActionButtonThemeData(
+    backgroundColor: darkColorScheme.secondary,
+    foregroundColor: darkColorScheme.onSecondary,
   ),
 );

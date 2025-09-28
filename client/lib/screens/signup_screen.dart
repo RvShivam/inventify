@@ -194,6 +194,9 @@ class _SignupScreenState extends State<SignupScreen> {
                         builder: (context) => const LoginScreen(),
                       ));
                     },
+                    style: TextButton.styleFrom(
+                      foregroundColor: Theme.of(context).colorScheme.secondary,
+                    ),
                     child: const Text('Sign in'),
                   ),
                 ],
