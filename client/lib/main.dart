@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:inventify/config/theme/theme.dart';
-import 'package:inventify/screens/signup_screen.dart'; 
+import 'package:inventify/screens/login_screen.dart';
 
 void main() {
   runApp(const MyApp());
@@ -17,7 +17,7 @@ class MyApp extends StatelessWidget {
       theme: lightTheme,
       darkTheme: darkTheme,
       themeMode: ThemeMode.system, 
-      home: const SignupScreen(), 
+      home: const LoginScreen(), 
     );
   }
 }

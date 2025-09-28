@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-
+import 'login_screen.dart';
 class Validators {
   static String? name(String? value) {
     if (value == null || value.isEmpty) {
@@ -190,7 +190,9 @@ class _SignupScreenState extends State<SignupScreen> {
                   Text("Already have an account?", style: textTheme.bodyMedium),
                   TextButton(
                     onPressed: () {
-                      // TODO: Navigate to Login Screen
+                      Navigator.of(context).push(MaterialPageRoute(
+                        builder: (context) => const LoginScreen(),
+                      ));
                     },
                     child: const Text('Sign in'),
                   ),
