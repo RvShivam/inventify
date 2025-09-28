@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:inventify/screens/signup.dart';
+import 'package:inventify/screens/signup_screen.dart';
 import 'package:inventify/screens/forgot_password.dart';
 
 class LoginScreen extends StatefulWidget {
