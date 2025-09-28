@@ -1,8 +1,5 @@
 import 'package:flutter/material.dart';
 
-// -------------------------------------------------------------
-// 1. DASHBOARD CONTENT WIDGET
-// -------------------------------------------------------------
 
 class DashboardContent extends StatelessWidget {
   const DashboardContent({super.key});

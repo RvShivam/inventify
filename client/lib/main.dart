@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:project/screens/signup.dart';
+import 'package:inventify/screens/signup.dart';
 
 
 void main() {

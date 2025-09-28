@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:project/screens/reset_password.dart';
+import 'package:inventify/screens/reset_password.dart';
 
 class ForgotPasswordScreen extends StatelessWidget {
   const ForgotPasswordScreen({super.key});
 
-  // Simple handler for button press (placeholder)
   void _sendResetLink(BuildContext context) {
-    // In a real app, you would validate the email and call an API here.
+    // TODO: Implement actual reset link logic
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Reset link sent to your email (placeholder)!')),
     );
