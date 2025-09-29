@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'login_screen.dart'; 
+import 'package:inventify/services/auth_service.dart';
+import 'login_screen.dart';
 
 class Validators {
   static String? name(String? value) {
@@ -49,7 +50,6 @@ class Validators {
   }
 }
 
-
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
 
@@ -59,7 +59,9 @@ class SignupScreen extends StatefulWidget {
 
 class _SignupScreenState extends State<SignupScreen> {
   final _formKey = GlobalKey<FormState>();
-  bool _isCreatingShop = true; 
+  bool _isCreatingShop = true;
+  bool _isLoading = false;
+  final AuthService _authService = AuthService();
 
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
@@ -77,42 +79,69 @@ class _SignupScreenState extends State<SignupScreen> {
     super.dispose();
   }
 
-  void _onSignupPressed() {
+  Future<void> _onSignupPressed() async {
     final isValid = _formKey.currentState?.validate() ?? false;
     if (!isValid) {
       return;
     }
 
-    // TODO: Add your API call logic here
-    print('Form is valid! Signing up...');
+    setState(() => _isLoading = true);
+
+    try {
+      final success = await _authService.signup(
+        name: _nameController.text,
+        email: _emailController.text,
+        password: _passwordController.text,
+        shopName: _isCreatingShop ? _shopNameController.text : "",
+        referralCode: _isCreatingShop ? "" : _referralController.text,
+      );
+
+      if (success && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text('Account created successfully! Please log in.')),
+        );
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (context) => const LoginScreen()),
+        );
+      } else {
+        throw Exception('An unknown error occurred.');
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Signup failed: ${e.toString()}')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
-    final colorScheme = Theme.of(context).colorScheme;
 
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        iconTheme: IconThemeData(color: colorScheme.onBackground),
+        iconTheme: IconThemeData(color: colors.onBackground),
       ),
       body: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 24.0),
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 400),
+            constraints: const BoxConstraints(maxWidth: 450),
             child: Container(
               padding: const EdgeInsets.all(24.0),
               decoration: BoxDecoration(
-                border: Border.all(
-                  color: Theme.of(context).dividerColor, 
-                ),
+                border: Border.all(color: Theme.of(context).dividerColor),
                 borderRadius: BorderRadius.circular(16),
               ),
-              // ADD THE FORM WIDGET HERE
               child: Form(
                 key: _formKey,
                 child: Column(
@@ -122,7 +151,8 @@ class _SignupScreenState extends State<SignupScreen> {
                     Text(
                       'Create Account',
                       textAlign: TextAlign.center,
-                      style: textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold),
+                      style: textTheme.headlineMedium
+                          ?.copyWith(fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(height: 32),
                     Text('Full Name', style: textTheme.bodySmall),
@@ -136,7 +166,6 @@ class _SignupScreenState extends State<SignupScreen> {
                       ),
                     ),
                     const SizedBox(height: 16),
-                    // ... The rest of your Column's children ...
                     Text('Email Address', style: textTheme.bodySmall),
                     const SizedBox(height: 8),
                     TextFormField(
@@ -175,8 +204,12 @@ class _SignupScreenState extends State<SignupScreen> {
                       borderColor: colors.onSurface.withOpacity(0.12),
                       selectedBorderColor: colors.primary,
                       children: const [
-                        Padding(padding: EdgeInsets.symmetric(horizontal: 29), child: Text('Create a new shop')),
-                        Padding(padding: EdgeInsets.symmetric(horizontal: 29), child: Text('Join with referral')),
+                        Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 16),
+                            child: Text('Create a new shop')),
+                        Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 16),
+                            child: Text('Join with referral')),
                       ],
                     ),
                     const SizedBox(height: 16),
@@ -185,25 +218,33 @@ class _SignupScreenState extends State<SignupScreen> {
                     else
                       _buildReferralField(textTheme),
                     const SizedBox(height: 24),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                        ),
-                        onPressed: _onSignupPressed,
-                        child: const Text('Create Account'),
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
                       ),
+                      onPressed: _isLoading ? null : _onSignupPressed,
+                      child: _isLoading
+                          ? const SizedBox(
+                              height: 24,
+                              width: 24,
+                              child: CircularProgressIndicator(
+                                color: Colors.white,
+                                strokeWidth: 2,
+                              ),
+                            )
+                          : const Text('Create Account'),
                     ),
                     const SizedBox(height: 16),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Text("Already have an account?", style: textTheme.bodyMedium),
+                        Text("Already have an account?",
+                            style: textTheme.bodyMedium),
                         TextButton(
                           onPressed: () {
                             Navigator.of(context).push(
-                              MaterialPageRoute(builder: (context) => const LoginScreen()),
+                              MaterialPageRoute(
+                                  builder: (context) => const LoginScreen()),
                             );
                           },
                           style: TextButton.styleFrom(
@@ -231,7 +272,8 @@ class _SignupScreenState extends State<SignupScreen> {
         const SizedBox(height: 8),
         TextFormField(
           controller: _shopNameController,
-          validator: (value) => Validators.required(value, 'Shop Name'),
+          validator: (value) =>
+              _isCreatingShop ? Validators.required(value, 'Shop Name') : null,
           decoration: const InputDecoration(
             hintText: 'Enter your shop name',
             prefixIcon: Icon(Icons.storefront_outlined),
@@ -249,7 +291,9 @@ class _SignupScreenState extends State<SignupScreen> {
         const SizedBox(height: 8),
         TextFormField(
           controller: _referralController,
-          validator: (value) => Validators.required(value, 'Referral Code'),
+          validator: (value) => !_isCreatingShop
+              ? Validators.required(value, 'Referral Code')
+              : null,
           decoration: const InputDecoration(
             hintText: 'Enter referral code',
             prefixIcon: Icon(Icons.group_add_outlined),

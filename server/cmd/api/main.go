@@ -3,6 +3,7 @@ package main
 import (
 	"github.com/RvShivam/inventify/internal/handlers"
 	"github.com/RvShivam/inventify/internal/models"
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 	"gorm.io/driver/postgres"
@@ -29,6 +30,7 @@ func main() {
 	log.Println("Database migrated")
 
 	router := gin.Default()
+	router.Use(cors.Default())
 	router.POST("/signup", handlers.Signup(db))
 	router.POST("/login", handlers.Login(db))
 	log.Println("Starting server on port 8080...")
