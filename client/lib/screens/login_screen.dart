@@ -140,6 +140,9 @@ class _LoginScreenState extends State<LoginScreen> {
                                     const ForgotPasswordScreen()),
                           );
                         },
+                        style: TextButton.styleFrom(
+                            foregroundColor: colorScheme.secondary,
+                          ),
                         child: const Text('Forgot Password?'),
                       ),
                     ),

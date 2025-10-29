@@ -23,7 +23,6 @@ class DashboardScreen extends StatelessWidget {
       {'title': 'Order #1080 - Scented Candle', 'subtitle': 'Amazon, 3h ago', 'amount': '\$15.50', 'color': colorScheme.secondary},
     ];
 
-    // The root widget is now the SingleChildScrollView, NOT a Scaffold
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16.0),
       child: LayoutBuilder(
