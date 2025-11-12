@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:inventify/widget/bottom_nav_bar.dart';
 import 'package:inventify/features/dashboard/dashboard_screen.dart';
+import 'package:inventify/screens/setting_screen.dart';
+import 'package:inventify/screens/channel_screen.dart';
+import 'package:inventify/screens/products_screen.dart';
 
 // Placeholder for screens you haven't built yet
 class PlaceholderScreen extends StatelessWidget {
@@ -27,10 +30,10 @@ class _MainScreenState extends State<MainScreen> {
   // List of all the main screens
   final List<Widget> _screens = [
     const DashboardScreen(),
-    const PlaceholderScreen(title: 'Products'),
+    const ProductsScreen(),
     const PlaceholderScreen(title: 'Orders'),
-    const PlaceholderScreen(title: 'Channels'),
-    const PlaceholderScreen(title: 'Settings'),
+    const ChannelsBody(),
+    const SettingsScreen(),
   ];
   
   // List of titles for the AppBar

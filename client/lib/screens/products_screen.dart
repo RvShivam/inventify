@@ -1,8 +1,23 @@
 import 'package:flutter/material.dart';
+import 'add_product.dart';
+import 'package:inventify/widget/filter.dart';
 
-// -------------------------------------------------------------
-// PRODUCTS SCREEN (MAIN VIEW)
-// -------------------------------------------------------------
+class Product {
+  final String name;
+  final int stock;
+  final String sku;
+  final double price;
+  final String category;
+
+  const Product({
+    required this.name,
+    required this.stock,
+    required this.sku,
+    required this.price,
+    required this.category,
+  });
+}
+
 class ProductsScreen extends StatefulWidget {
   const ProductsScreen({super.key});
 
@@ -11,120 +26,203 @@ class ProductsScreen extends StatefulWidget {
 }
 
 class _ProductsScreenState extends State<ProductsScreen> {
-  // State to manage the active filter button
-  String _activeFilter = 'In Stock'; 
+  ProductFilter _activeFilters = ProductFilter.initial();
+  String _query = '';
+  String _simpleFilter = 'All';
 
-  void _showFilterModal() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      builder: (context) {
-        return const FilterModal();
-      },
-    );
+  final List<Product> _allProducts = const [
+    Product(name: 'Freshwear Scarf', stock: 55, sku: 'SCARF-BLU41', price: 15.00, category: 'Apparel'),
+    Product(name: 'Scented Candle', stock: 12, sku: 'CANDLE-LAV-05', price: 21.00, category: 'Home Goods'),
+    Product(name: 'Clay Vase', stock: 0, sku: 'VASE-GRN-K1D', price: 40.00, category: 'Decor'),
+    Product(name: 'Leather Belt', stock: 200, sku: 'BELT-BLK-LGE', price: 35.00, category: 'Accessories'),
+    Product(name: 'Copper Mug', stock: 5, sku: 'MUG-COP-001', price: 18.00, category: 'Kitchen'),
+    Product(name: 'Smart Watch', stock: 10, sku: 'WATCH-SMT-A90', price: 199.00, category: 'Electronics'),
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _activeFilters.priceRange = RangeValues(0, _allProducts.map((p) => p.price).reduce((a, b) => a > b ? a : b));
+    _activeFilters.stockRange = RangeValues(0, _allProducts.map((p) => p.stock).reduce((a, b) => a > b ? a : b).toDouble());
   }
 
-  void _showAddProductModal() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) {
-        return const AddProductModal();
-      },
+  void _openFilters() async {
+    final result = await Navigator.push<ProductFilter>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => FilterScreen(
+          initialFilters: _activeFilters,
+          onApplyFilters: (newFilters) {
+            setState(() {
+              _activeFilters = newFilters;
+            });
+          },
+        ),
+      ),
     );
+
+    if (result != null && mounted) {
+      setState(() {
+        _activeFilters = result;
+      });
+    }
+  }
+
+  void _goToAddProduct() async {
+    final result = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(builder: (_) => const AddNewProductScreen()),
+    );
+    if (result == true && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Product added')),
+      );
+      setState(() {});
+    }
+  }
+
+  List<Product> get _filteredProducts {
+    Iterable<Product> list = _allProducts;
+
+    switch (_simpleFilter) {
+      case 'In Stock':
+        list = list.where((p) => p.stock > 0);
+        break;
+      case 'Out of Stock':
+        list = list.where((p) => p.stock == 0);
+        break;
+      case 'All':
+      default:
+        break;
+    }
+
+    if (_query.trim().isNotEmpty) {
+      final q = _query.trim().toLowerCase();
+      list = list.where((p) => p.name.toLowerCase().contains(q) || p.sku.toLowerCase().contains(q));
+    }
+
+    list = list.where((p) {
+      final meetsPrice = p.price >= _activeFilters.priceRange.start && p.price <= _activeFilters.priceRange.end;
+      final meetsStockRange = p.stock >= _activeFilters.stockRange.start.round() && p.stock <= _activeFilters.stockRange.end.round();
+      final isLowStock = p.stock > 0 && p.stock < 20;
+      final isOutOfStock = p.stock == 0;
+
+      final meetsCategory = _activeFilters.selectedCategories.isEmpty || _activeFilters.selectedCategories.contains(p.category);
+
+      bool meetsStockStatus = true;
+      if (_activeFilters.showLowStockOnly && !_activeFilters.showOutOfStockOnly) {
+        meetsStockStatus = isLowStock;
+      } else if (_activeFilters.showOutOfStockOnly && !_activeFilters.showLowStockOnly) {
+        meetsStockStatus = isOutOfStock;
+      } else if (_activeFilters.showLowStockOnly && _activeFilters.showOutOfStockOnly) {
+        meetsStockStatus = isLowStock || isOutOfStock;
+      }
+
+      return meetsPrice && meetsStockRange && meetsCategory && meetsStockStatus;
+    });
+    return list.toList();
   }
 
   @override
   Widget build(BuildContext context) {
-    // Note: This Scaffold includes the AppBar for the Products view.
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
-      appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () {
-            // In a bottom navigation tab, this usually does nothing or navigates to a root screen
-          },
-        ),
-        title: const Text('Products'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.add_circle_outline),
-            onPressed: _showAddProductModal,
-          ),
-          IconButton(
-            icon: const Icon(Icons.filter_list),
-            onPressed: _showFilterModal,
-          ),
-          const SizedBox(width: 8.0),
-        ],
-        elevation: 0.0,
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
+      floatingActionButton: FloatingActionButton(
+        onPressed: _goToAddProduct,
+         backgroundColor: cs.secondary, // ✅ FAB background is now secondary color
+         foregroundColor: cs.onSecondary,
+        child: Icon(Icons.add),
       ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       body: Column(
         children: [
-          // Search Field and Filter Bar
+          // Search + Filter icon
           Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+            child: Row(
               children: [
-                // Search Input Field
-                TextField(
-                  decoration: InputDecoration(
-                    hintText: 'Search products...',
-                    prefixIcon: const Icon(Icons.search),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8.0),
-                      borderSide: BorderSide.none,
+                Expanded(
+                  child: TextField(
+                    onChanged: (v) => setState(() => _query = v),
+                    style: TextStyle(color: cs.onSurface),
+                    cursorColor: cs.primary,
+                    decoration: InputDecoration(
+                      hintText: 'Search products...',
+                      hintStyle: TextStyle(color: cs.onSurface.withOpacity(.6)),
+                      prefixIcon: Icon(Icons.search, color: cs.onSurface.withOpacity(.7)),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8.0),
+                        borderSide: BorderSide.none,
+                      ),
+                      filled: true,
+                      // Adaptive fill color for light/dark
+                      fillColor: isDark ? cs.surfaceVariant.withOpacity(.06) : cs.surfaceVariant.withOpacity(.12),
+                      contentPadding: const EdgeInsets.symmetric(vertical: 12),
                     ),
-                    filled: true,
-                    fillColor: Colors.grey[100],
-                    contentPadding: const EdgeInsets.symmetric(vertical: 0),
                   ),
                 ),
-                const SizedBox(height: 16.0),
-                
-                // Filter Buttons Row
-                Row(
-                  children: [
-                    FilterButton(
-                      label: 'In Stock',
-                      isActive: _activeFilter == 'In Stock',
-                      onPressed: () => setState(() => _activeFilter = 'In Stock'),
-                    ),
-                    const SizedBox(width: 8.0),
-                    FilterButton(
-                      label: 'Out of Stock',
-                      isActive: _activeFilter == 'Out of Stock',
-                      onPressed: () => setState(() => _activeFilter = 'Out of Stock'),
-                    ),
-                    const SizedBox(width: 8.0),
-                    FilterButton(
-                      label: 'Low Stock',
-                      isActive: _activeFilter == 'Low Stock',
-                      onPressed: () => setState(() => _activeFilter = 'Low Stock'),
-                    ),
-                  ],
+                const SizedBox(width: 8),
+                IconButton(
+                  tooltip: 'Filter',
+                  onPressed: _openFilters,
+                  icon: Icon(Icons.filter_list, color: cs.onSurface.withOpacity(.8)),
                 ),
               ],
             ),
           ),
 
-          // Product List Section
-          Expanded(
-            child: ListView(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0),
-              children: const <Widget>[
-                ProductTile(name: 'Freshwear Scarf', stock: 55, sku: 'SCARF-BLU41', price: 15.00),
-                Divider(),
-                ProductTile(name: 'Scented Candle', stock: 12, sku: 'CANDLE-LAV-05', price: 21.00),
-                Divider(),
-                ProductTile(name: 'Clay Vase', stock: 0, sku: 'VASE-GRN-K1D', price: 40.00),
-                Divider(),
-                ProductTile(name: 'Leather Belt', stock: 200, sku: 'BELT-BLK-LGE', price: 35.00),
-                Divider(),
+          const SizedBox(height: 12),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0),
+            child: Row(
+              children: [
+                FilterButton(
+                  label: 'All',
+                  isActive: _simpleFilter == 'All',
+                  onPressed: () => setState(() => _simpleFilter = 'All'),
+                ),
+                const SizedBox(width: 8.0),
+                FilterButton(
+                  label: 'In Stock',
+                  isActive: _simpleFilter == 'In Stock',
+                  onPressed: () => setState(() => _simpleFilter = 'In Stock'),
+                ),
+                const SizedBox(width: 8.0),
+                FilterButton(
+                  label: 'Out of Stock',
+                  isActive: _simpleFilter == 'Out of Stock',
+                  onPressed: () => setState(() => _simpleFilter = 'Out of Stock'),
+                ),
               ],
+            ),
+          ),
+          const SizedBox(height: 8),
+          // Product list (filtered)
+          Expanded(
+            child: Builder(
+              builder: (_) {
+                final items = _filteredProducts;
+                if (items.isEmpty) {
+                  return const Center(
+                    child: Text('No products match this filter.'),
+                  );
+                }
+                return ListView.separated(
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                  itemCount: items.length,
+                  separatorBuilder: (_, __) => const Divider(),
+                  itemBuilder: (_, i) {
+                    final p = items[i];
+                    return ProductTile(
+                      name: p.name,
+                      stock: p.stock,
+                      sku: p.sku,
+                      price: p.price,
+                    );
+                  },
+                );
+              },
             ),
           ),
         ],
@@ -133,9 +231,9 @@ class _ProductsScreenState extends State<ProductsScreen> {
   }
 }
 
-// -------------------------------------------------------------
-// HELPER WIDGETS
-// -------------------------------------------------------------
+// ----------------------------------------------------------------
+// --- UI helpers (ProductTile and FilterButton) ---
+// ----------------------------------------------------------------
 
 class ProductTile extends StatelessWidget {
   final String name;
@@ -143,7 +241,13 @@ class ProductTile extends StatelessWidget {
   final String sku;
   final double price;
 
-  const ProductTile({super.key, required this.name, required this.stock, required this.sku, required this.price});
+  const ProductTile({
+    super.key,
+    required this.name,
+    required this.stock,
+    required this.sku,
+    required this.price,
+  });
 
   Color getStockColor(int stock) {
     if (stock == 0) return Colors.red;
@@ -159,7 +263,10 @@ class ProductTile extends StatelessWidget {
       leading: Container(
         width: 48,
         height: 48,
-        decoration: BoxDecoration(color: Colors.grey[200], borderRadius: BorderRadius.circular(8.0)),
+        decoration: BoxDecoration(
+          color: Colors.grey[200],
+          borderRadius: BorderRadius.circular(8.0),
+        ),
         child: const Icon(Icons.shopping_bag_outlined, color: Colors.grey),
       ),
       title: Text(name, style: const TextStyle(fontWeight: FontWeight.bold)),
@@ -168,7 +275,8 @@ class ProductTile extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.end,
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Text('\$${price.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold)),
+          // Rupee symbol used here
+          Text('₹${price.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold)),
           const SizedBox(height: 4),
           Text('Stock: $stock', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: stockColor)),
         ],
@@ -178,21 +286,37 @@ class ProductTile extends StatelessWidget {
   }
 }
 
+/// FilterButton now uses the theme's secondary color for active state
 class FilterButton extends StatelessWidget {
   final String label;
   final bool isActive;
   final VoidCallback onPressed;
 
-  const FilterButton({super.key, required this.label, required this.isActive, required this.onPressed});
+  const FilterButton({
+    super.key,
+    required this.label,
+    required this.isActive,
+    required this.onPressed,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
+    final activeBg = cs.secondary;
+    final activeFg = cs.onSecondary;
+    final inactiveFg = cs.onSurface.withOpacity(.85);
+    final inactiveBorder = cs.outline;
+
     return OutlinedButton(
       onPressed: onPressed,
       style: OutlinedButton.styleFrom(
-        foregroundColor: isActive ? Colors.white : Colors.grey[700],
-        backgroundColor: isActive ? Colors.blue : Colors.transparent,
-        side: BorderSide(color: isActive ? Colors.blue : Colors.grey.shade300, width: 1.0),
+        foregroundColor: isActive ? activeFg : inactiveFg,
+        backgroundColor: isActive ? activeBg : Colors.transparent,
+        side: BorderSide(
+          color: isActive ? activeBg : inactiveBorder,
+          width: 1.0,
+        ),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16.0)),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       ),
@@ -200,101 +324,3 @@ class FilterButton extends StatelessWidget {
     );
   }
 }
-
-class FilterModal extends StatelessWidget {
-  const FilterModal({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    // ... (Filter Modal UI code from previous response)
-    return SizedBox(
-      height: MediaQuery.of(context).size.height * 0.90, 
-      child: Padding(
-        padding: const EdgeInsets.all(20.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Header
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text('Advanced Filters', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
-                TextButton(onPressed: () => Navigator.pop(context), child: const Text('Reset', style: TextStyle(color: Colors.blue))),
-              ],
-            ),
-            const Divider(),
-            // ... Filter Content (omitted for brevity)
-            const Expanded(child: Center(child: Text("Filter Sliders and Sort Options"))),
-            // Apply Button
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () => Navigator.pop(context),
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                  backgroundColor: Colors.blue,
-                  foregroundColor: Colors.white,
-                ),
-                child: const Text('Apply Filters'),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class AddProductModal extends StatelessWidget {
-  const AddProductModal({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    // ... (Add Product Modal UI code from previous response)
-    return Container(
-      width: MediaQuery.of(context).size.width,
-      height: MediaQuery.of(context).size.height * 0.90,
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(20.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Header
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text('Add New Product', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
-                IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(context)),
-              ],
-            ),
-            const Divider(),
-            // ... Form Content (omitted for brevity)
-            const Expanded(child: Center(child: Text("Product Upload Form Fields"))),
-            // Save Button
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () => Navigator.pop(context),
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                  backgroundColor: Colors.green,
-                  foregroundColor: Colors.white,
-                ),
-                child: const Text('Save New Product'),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-// -------------------------------------------------------------
-// END product_page.dart
-// -------------------------------------------------------------
