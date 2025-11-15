@@ -14,11 +14,31 @@ class _ChannelsAndPublishingStepState extends State<ChannelsAndPublishingStep> {
   bool ondcEnabled = false;
 
   // --- WooCommerce Settings ---
+  // New: Simple product type (non-changeable for this UI)
+  final String wooProductType = 'simple';
+  // New: Toggle for custom price
+  bool wooUseCustomPrice = false;
   final TextEditingController wooCustomPriceCtrl = TextEditingController();
-  String? wooTaxStatus; // taxable, shipping, none
-  final TextEditingController wooShippingClassCtrl = TextEditingController();
+  // New: Catalog Visibility
+  String wooCatalogVisibility = 'visible'; // visible, catalog, search, hidden
+ 
 
   // --- ONDC Settings ---
+  // New: Toggles for returnable/cancellable
+  bool ondcReturnable = true;
+  bool ondcCancellable = true;
+  // New: Toggle for custom price
+  bool ondcUseCustomPrice = false;
+  final TextEditingController ondcCustomPriceCtrl = TextEditingController();
+  final TextEditingController ondcWarrantyCtrl = TextEditingController(); // Optional
+  // New: Fulfillment Type (delivery / pickup / both)
+  String? ondcFulfillmentType;
+  // New: Fulfillment Time to Ship (ISO duration)
+  final TextEditingController ondcTimeToShipCtrl = TextEditingController(); // e.g., P1D or PT24H
+  // New: City Code
+  final TextEditingController ondcCityCodeCtrl = TextEditingController();
+  // New: Location ID (Simplified for UI, usually a Multi-Select or complex logic)
+  String? ondcLocationId;
   String? ondcCategory; // e.g., Grocery, Fashion, Electronics
   String? ondcFulfillment; // Hyperlocal / Intercity
   final TextEditingController ondcReturnWindowDaysCtrl = TextEditingController();
@@ -27,18 +47,53 @@ class _ChannelsAndPublishingStepState extends State<ChannelsAndPublishingStep> {
   @override
   void dispose() {
     wooCustomPriceCtrl.dispose();
-    wooShippingClassCtrl.dispose();
+    
     ondcReturnWindowDaysCtrl.dispose();
     ondcMaxDispatchHrsCtrl.dispose();
+    ondcCustomPriceCtrl.dispose();
+    ondcWarrantyCtrl.dispose();
+    ondcTimeToShipCtrl.dispose();
+    ondcCityCodeCtrl.dispose();
     super.dispose();
   }
 
   int get selectedCount => [wooEnabled, ondcEnabled].where((e) => e).length;
 
   void _saveAndPublish() {
+    // Collect all data for publishing
+    final wooData = {
+      'enabled': wooEnabled,
+      'product_type': wooProductType,
+      'custom_price_enabled': wooUseCustomPrice,
+      'custom_price': wooUseCustomPrice ? wooCustomPriceCtrl.text : null,
+      'catalog_visibility': wooCatalogVisibility,
+    };
+
+    final ondcData = {
+      'enabled': ondcEnabled,
+      'returnable': ondcReturnable,
+      'cancellable': ondcCancellable,
+      'custom_price_enabled': ondcUseCustomPrice,
+      'custom_price': ondcUseCustomPrice ? ondcCustomPriceCtrl.text : null,
+      'warranty': ondcWarrantyCtrl.text.isNotEmpty ? ondcWarrantyCtrl.text : null,
+      'fulfillment_type': ondcFulfillmentType,
+      'time_to_ship': ondcTimeToShipCtrl.text,
+      'city_code': ondcCityCodeCtrl.text,
+      'location_id': ondcLocationId,
+      'category': ondcCategory,
+      // Existing ONDC fields (kept for context, but new fields take precedence in a real system)
+      'ondcFulfillment': ondcFulfillment,
+      'return_window_days': ondcReturnWindowDaysCtrl.text,
+      'max_dispatch_hours': ondcMaxDispatchHrsCtrl.text,
+    };
+
+    // Print or process the data
+    debugPrint('WooCommerce Data: $wooData');
+    debugPrint('ONDC Data: $ondcData');
+
     // Validate nothing heavy here; you can add per-channel validations if required.
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Publishing to $selectedCount channel(s)…')),
+      SnackBar(content: Text('Publishing to $selectedCount channel(s) with custom settings…')),
     );
   }
 
@@ -47,6 +102,7 @@ class _ChannelsAndPublishingStepState extends State<ChannelsAndPublishingStep> {
     final cs = Theme.of(context).colorScheme;
     final t = Theme.of(context).textTheme;
 
+    // Use a local state setter for the custom price toggle within the bottom sheet
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -55,83 +111,108 @@ class _ChannelsAndPublishingStepState extends State<ChannelsAndPublishingStep> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
       builder: (ctx) {
-        return Padding(
-          padding: EdgeInsets.only(
-            left: 16,
-            right: 16,
-            top: 12,
-            bottom: MediaQuery.of(ctx).viewInsets.bottom + 16,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
+        return StatefulBuilder(
+          builder: (BuildContext context, StateSetter setModalState) {
+            return Padding(
+              padding: EdgeInsets.only(
+                left: 16,
+                right: 16,
+                top: 12,
+                bottom: MediaQuery.of(ctx).viewInsets.bottom + 16,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('WooCommerce Settings', style: t.titleMedium),
-                  const Spacer(),
-                  IconButton(
-                    onPressed: () => Navigator.pop(ctx),
-                    icon: const Icon(Icons.close),
+                  Row(
+                    children: [
+                      Text('WooCommerce Settings', style: t.titleMedium),
+                      const Spacer(),
+                      IconButton(
+                        onPressed: () => Navigator.pop(ctx),
+                        icon: const Icon(Icons.close),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text('Customize pricing and metadata for this channel', style: t.bodySmall),
+                  const SizedBox(height: 16),
+                  
+                  // Product Type (Non-changeable)
+                  Text('Product Type', style: t.labelLarge),
+                  const SizedBox(height: 4),
+                  Text('Simple', style: t.bodyLarge?.copyWith(fontWeight: FontWeight.w500, color: cs.secondary)),
+                  const SizedBox(height: 16),
+
+                  // Custom Price Toggle
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('Use Custom Price (Override)', style: t.labelLarge),
+                      Switch(
+                        value: wooUseCustomPrice,
+                        onChanged: (v) => setModalState(() => wooUseCustomPrice = v),
+
+                        activeTrackColor: Theme.of(context).colorScheme.secondary,
+                        activeColor: Colors.white,
+                        inactiveTrackColor: Theme.of(context).colorScheme.surfaceVariant,
+                        inactiveThumbColor: Theme.of(context).colorScheme.outlineVariant,
+                        trackOutlineColor: MaterialStateProperty.all(Colors.transparent),
+                      ),
+                    ],
+                  ),
+                  
+                  // Custom Price Field
+                  if (wooUseCustomPrice) ...[
+                    const SizedBox(height: 6),
+                    TextFormField(
+                      controller: wooCustomPriceCtrl,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}'))],
+                      decoration: InputDecoration(
+                        hintText: 'Enter custom price',
+                        prefixIcon: Icon(Icons.attach_money, color: cs.secondary, size: 18),
+                        suffixIcon: IconButton(
+                          onPressed: () => wooCustomPriceCtrl.clear(),
+                          icon: const Icon(Icons.clear),
+                          tooltip: 'Clear',
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                  ] else const SizedBox(height: 8),
+                  
+                  // Catalog Visibility
+                  Text('Catalog Visibility', style: t.labelLarge),
+                  const SizedBox(height: 6),
+                  DropdownButtonFormField<String>(
+                    value: wooCatalogVisibility,
+                    items: const [
+                      DropdownMenuItem(value: 'visible', child: Text('Shop and Search Results')),
+                      DropdownMenuItem(value: 'catalog', child: Text('Shop Only')),
+                      DropdownMenuItem(value: 'search', child: Text('Search Only')),
+                      DropdownMenuItem(value: 'hidden', child: Text('Hidden')),
+                    ],
+                    onChanged: (v) => setModalState(() => wooCatalogVisibility = v ?? 'visible'),
+                    decoration: const InputDecoration(hintText: 'Select visibility'),
+                  ),
+                  const SizedBox(height: 16),
+                 
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton(
+                      onPressed: () {
+                        // Crucially, update the parent state when closing
+                        setState(() {}); 
+                        Navigator.pop(ctx);
+                      },
+                      child: const Text('Save Settings'),
+                    ),
                   ),
                 ],
               ),
-              const SizedBox(height: 8),
-              Text('Customize pricing and metadata for this channel', style: t.bodySmall),
-              const SizedBox(height: 16),
-
-              // Custom Price
-              Text('Custom Price (Override)', style: t.labelLarge),
-              const SizedBox(height: 6),
-              TextFormField(
-                controller: wooCustomPriceCtrl,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}'))],
-                decoration: InputDecoration(
-                  hintText: 'Leave empty to use default price',
-                  prefixIcon: Icon(Icons.attach_money, color: cs.secondary, size: 18),
-                  suffixIcon: IconButton(
-                    onPressed: () => wooCustomPriceCtrl.clear(),
-                    icon: const Icon(Icons.clear),
-                    tooltip: 'Clear',
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-
-              // Tax Status
-              Text('Tax Status', style: t.labelLarge),
-              const SizedBox(height: 6),
-              DropdownButtonFormField<String>(
-                value: wooTaxStatus,
-                items: const [
-                  DropdownMenuItem(value: 'taxable', child: Text('Taxable')),
-                  DropdownMenuItem(value: 'shipping', child: Text('Shipping')),
-                  DropdownMenuItem(value: 'none', child: Text('None')),
-                ],
-                onChanged: (v) => setState(() => wooTaxStatus = v),
-                decoration: const InputDecoration(hintText: 'Select tax status'),
-              ),
-              const SizedBox(height: 16),
-
-              // Shipping Class
-              Text('Shipping Class', style: t.labelLarge),
-              const SizedBox(height: 6),
-              TextFormField(
-                controller: wooShippingClassCtrl,
-                decoration: const InputDecoration(hintText: 'e.g., standard'),
-              ),
-              const SizedBox(height: 16),
-
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton(
-                  onPressed: () => Navigator.pop(ctx),
-                  child: const Text('Save Settings'),
-                ),
-              ),
-            ],
-          ),
+            );
+          },
         );
       },
     );
@@ -149,91 +230,235 @@ class _ChannelsAndPublishingStepState extends State<ChannelsAndPublishingStep> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
       builder: (ctx) {
-        return Padding(
-          padding: EdgeInsets.only(
-            left: 16,
-            right: 16,
-            top: 12,
-            bottom: MediaQuery.of(ctx).viewInsets.bottom + 16,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
+        return StatefulBuilder(
+          builder: (BuildContext context, StateSetter setModalState) {
+            return Padding(
+              padding: EdgeInsets.only(
+                left: 16,
+                right: 16,
+                top: 12,
+                bottom: MediaQuery.of(ctx).viewInsets.bottom ,
+              ),
+              child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('ONDC Settings', style: t.titleMedium),
-                  const Spacer(),
-                  IconButton(
-                    onPressed: () => Navigator.pop(ctx),
-                    icon: const Icon(Icons.close),
+                  Row(
+                    children: [
+                      Text('ONDC Settings', style: t.titleMedium),
+                      const Spacer(),
+                      IconButton(
+                        onPressed: () => Navigator.pop(ctx),
+                        icon: const Icon(Icons.close),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text('Set ONDC-specific catalog and SLA values', style: t.bodySmall),
+                  const SizedBox(height: 16),
+
+                  // Returnable Toggle
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('Returnable', style: t.labelLarge),
+                      Switch(
+                        value: ondcReturnable,
+                        onChanged: (v) => setModalState(() => ondcReturnable = v),
+                        activeTrackColor: Theme.of(context).colorScheme.secondary,
+                        activeColor: Colors.white,
+                        inactiveTrackColor: Theme.of(context).colorScheme.surfaceVariant,
+                        inactiveThumbColor: Theme.of(context).colorScheme.outlineVariant,
+                        trackOutlineColor: MaterialStateProperty.all(Colors.transparent),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+
+                  // Cancellable Toggle
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('Cancellable', style: t.labelLarge),
+                      Switch(
+                        value: ondcCancellable,
+                        onChanged: (v) => setModalState(() => ondcCancellable = v),
+                        activeTrackColor: Theme.of(context).colorScheme.secondary,
+                        activeColor: Colors.white,
+                        inactiveTrackColor: Theme.of(context).colorScheme.surfaceVariant,
+                        inactiveThumbColor: Theme.of(context).colorScheme.outlineVariant,
+                        trackOutlineColor: MaterialStateProperty.all(Colors.transparent),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Custom Price Toggle
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('Use Custom Price (Override)', style: t.labelLarge),
+                      Switch(
+                        value: ondcUseCustomPrice,
+                        onChanged: (v) => setModalState(() => ondcUseCustomPrice = v),
+                        activeTrackColor: Theme.of(context).colorScheme.secondary,
+                        activeColor: Colors.white,
+                        inactiveTrackColor: Theme.of(context).colorScheme.surfaceVariant,
+                        inactiveThumbColor: Theme.of(context).colorScheme.outlineVariant,
+                        trackOutlineColor: MaterialStateProperty.all(Colors.transparent),
+                      ),
+                    ],
+                  ),
+                  
+                  // Custom Price Field
+                  if (ondcUseCustomPrice) ...[
+                    const SizedBox(height: 6),
+                    TextFormField(
+                      controller: ondcCustomPriceCtrl,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}'))],
+                      decoration: InputDecoration(
+                        hintText: 'Enter custom price',
+                        prefixIcon: Icon(Icons.attach_money, color: cs.secondary, size: 18),
+                        suffixIcon: IconButton(
+                          onPressed: () => ondcCustomPriceCtrl.clear(),
+                          icon: const Icon(Icons.clear),
+                          tooltip: 'Clear',
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                  ] else const SizedBox(height: 8),
+
+                  // Warranty (Optional)
+                  Text('Warranty (Optional)', style: t.labelLarge),
+                  const SizedBox(height: 6),
+                  TextFormField(
+                    controller: ondcWarrantyCtrl,
+                    decoration: const InputDecoration(hintText: 'e.g., 1 Year Manufacturer Warranty'),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Fulfillment Type
+                  Text('Fulfillment Type', style: t.labelLarge),
+                  const SizedBox(height: 6),
+                  DropdownButtonFormField<String>(
+                    value: ondcFulfillmentType,
+                    items: const [
+                      DropdownMenuItem(value: 'delivery', child: Text('Delivery Only')),
+                      DropdownMenuItem(value: 'pickup', child: Text('Pickup Only')),
+                      DropdownMenuItem(value: 'both', child: Text('Delivery and Pickup')),
+                    ],
+                    onChanged: (v) => setModalState(() => ondcFulfillmentType = v),
+                    decoration: const InputDecoration(hintText: 'Choose fulfillment type'),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Time to Ship (ISO Duration)
+                  Text('Time to Ship (ISO Duration)', style: t.labelLarge),
+                  const SizedBox(height: 6),
+                  TextFormField(
+                    controller: ondcTimeToShipCtrl,
+                    decoration: const InputDecoration(hintText: 'e.g., P1D (1 Day) or PT24H (24 Hours)'),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // City Code
+                  Text('City Code', style: t.labelLarge),
+                  const SizedBox(height: 6),
+                  TextFormField(
+                    controller: ondcCityCodeCtrl,
+                    decoration: const InputDecoration(hintText: 'e.g., HYD, DEL'),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Location ID (Simplified dropdown)
+                  Text('Seller Location', style: t.labelLarge),
+                  const SizedBox(height: 6),
+                  DropdownButtonFormField<String>(
+                    value: ondcLocationId,
+                    items: const [
+                      DropdownMenuItem(value: 'loc_1', child: Text('Main Warehouse - Secunderabad')),
+                      DropdownMenuItem(value: 'loc_2', child: Text('Retail Store - Gachibowli')),
+                    ],
+                    onChanged: (v) => setModalState(() => ondcLocationId = v),
+                    decoration: const InputDecoration(hintText: 'Select seller location'),
+                  ),
+                  
+                  
+                  // **********************************************
+                  // KEPT FOR CONTEXT, BUT REMOVED FROM ORIGINAL PLAN
+                  // **********************************************
+                  // // Category (Existing field)
+                  // Text('Category', style: t.labelLarge),
+                  // const SizedBox(height: 6),
+                  // DropdownButtonFormField<String>(
+                  //   value: ondcCategory,
+                  //   items: const [
+                  //     DropdownMenuItem(value: 'grocery', child: Text('Grocery')),
+                  //     DropdownMenuItem(value: 'fashion', child: Text('Fashion')),
+                  //     DropdownMenuItem(value: 'electronics', child: Text('Electronics')),
+                  //   ],
+                  //   onChanged: (v) => setModalState(() => ondcCategory = v),
+                  //   decoration: const InputDecoration(hintText: 'Select a category'),
+                  // ),
+                  // const SizedBox(height: 16),
+
+                  // // Fulfillment Type (Existing field)
+                  // Text('Fulfillment', style: t.labelLarge),
+                  // const SizedBox(height: 6),
+                  // DropdownButtonFormField<String>(
+                  //   value: ondcFulfillment,
+                  //   items: const [
+                  //     DropdownMenuItem(value: 'hyperlocal', child: Text('Hyperlocal')),
+                  //     DropdownMenuItem(value: 'intercity', child: Text('Intercity')),
+                  //   ],
+                  //   onChanged: (v) => setModalState(() => ondcFulfillment = v),
+                  //   decoration: const InputDecoration(hintText: 'Choose fulfillment type'),
+                  // ),
+                  // const SizedBox(height: 16),
+                  
+                  // // Return Window (days) (Existing field)
+                  // Text('Return Window (days)', style: t.labelLarge),
+                  // const SizedBox(height: 6),
+                  // TextFormField(
+                  //   controller: ondcReturnWindowDaysCtrl,
+                  //   keyboardType: TextInputType.number,
+                  //   inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  //   decoration: const InputDecoration(hintText: 'e.g., 7'),
+                  // ),
+                  // const SizedBox(height: 16),
+
+                  // // Max Dispatch Time (hours) (Existing field)
+                  // Text('Max Dispatch Time (hours)', style: t.labelLarge),
+                  // const SizedBox(height: 6),
+                  // TextFormField(
+                  //   controller: ondcMaxDispatchHrsCtrl,
+                  //   keyboardType: TextInputType.number,
+                  //   inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  //   decoration: const InputDecoration(hintText: 'e.g., 24'),
+                  // ),
+                   const SizedBox(height: 16),
+                  
+                  // **********************************************
+
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton(
+                      onPressed: () {
+                        // Crucially, update the parent state when closing
+                        setState(() {}); 
+                        Navigator.pop(ctx);
+                      },
+                      child: const Text('Save Settings'),
+                    ),
                   ),
                 ],
               ),
-              const SizedBox(height: 8),
-              Text('Set ONDC-specific catalog and SLA values', style: t.bodySmall),
-              const SizedBox(height: 16),
-
-              // Category
-              Text('Category', style: t.labelLarge),
-              const SizedBox(height: 6),
-              DropdownButtonFormField<String>(
-                value: ondcCategory,
-                items: const [
-                  DropdownMenuItem(value: 'grocery', child: Text('Grocery')),
-                  DropdownMenuItem(value: 'fashion', child: Text('Fashion')),
-                  DropdownMenuItem(value: 'electronics', child: Text('Electronics')),
-                ],
-                onChanged: (v) => setState(() => ondcCategory = v),
-                decoration: const InputDecoration(hintText: 'Select a category'),
               ),
-              const SizedBox(height: 16),
-
-              // Fulfillment Type
-              Text('Fulfillment', style: t.labelLarge),
-              const SizedBox(height: 6),
-              DropdownButtonFormField<String>(
-                value: ondcFulfillment,
-                items: const [
-                  DropdownMenuItem(value: 'hyperlocal', child: Text('Hyperlocal')),
-                  DropdownMenuItem(value: 'intercity', child: Text('Intercity')),
-                ],
-                onChanged: (v) => setState(() => ondcFulfillment = v),
-                decoration: const InputDecoration(hintText: 'Choose fulfillment type'),
-              ),
-              const SizedBox(height: 16),
-
-              // Return Window (days)
-              Text('Return Window (days)', style: t.labelLarge),
-              const SizedBox(height: 6),
-              TextFormField(
-                controller: ondcReturnWindowDaysCtrl,
-                keyboardType: TextInputType.number,
-                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                decoration: const InputDecoration(hintText: 'e.g., 7'),
-              ),
-              const SizedBox(height: 16),
-
-              // Max Dispatch Time (hours)
-              Text('Max Dispatch Time (hours)', style: t.labelLarge),
-              const SizedBox(height: 6),
-              TextFormField(
-                controller: ondcMaxDispatchHrsCtrl,
-                keyboardType: TextInputType.number,
-                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                decoration: const InputDecoration(hintText: 'e.g., 24'),
-              ),
-              const SizedBox(height: 16),
-
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton(
-                  onPressed: () => Navigator.pop(ctx),
-                  child: const Text('Save Settings'),
-                ),
-              ),
-            ],
-          ),
+            );
+          },
         );
       },
     );
@@ -302,7 +527,7 @@ class _ChannelsAndPublishingStepState extends State<ChannelsAndPublishingStep> {
               const _StepperRowStep4Active(),
               const SizedBox(height: 16),
 
-              // Card: Select Sales Channels (Shopify removed)
+              // Card: Select Sales Channels
               _boxed(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -319,6 +544,7 @@ class _ChannelsAndPublishingStepState extends State<ChannelsAndPublishingStep> {
                     _channelTile(
                       context,
                       title: 'WooCommerce',
+                      subtitle: 'Product Type: ${wooProductType.toUpperCase()}',
                       enabled: wooEnabled,
                       onChanged: (v) => setState(() => wooEnabled = v),
                       trailing: wooEnabled
@@ -335,6 +561,9 @@ class _ChannelsAndPublishingStepState extends State<ChannelsAndPublishingStep> {
                     _channelTile(
                       context,
                       title: 'ONDC',
+                      subtitle: ondcEnabled && ondcFulfillmentType != null 
+                        ? 'Fulfillment: ${ondcFulfillmentType!.toUpperCase()}'
+                        : null,
                       enabled: ondcEnabled,
                       onChanged: (v) => setState(() => ondcEnabled = v),
                       trailing: ondcEnabled
@@ -413,6 +642,7 @@ class _ChannelsAndPublishingStepState extends State<ChannelsAndPublishingStep> {
  Widget _channelTile(
   BuildContext context, {
   required String title,
+  String? subtitle, // New subtitle for extra info
   required bool enabled,
   required ValueChanged<bool> onChanged,
   Widget? trailing,
@@ -448,6 +678,12 @@ class _ChannelsAndPublishingStepState extends State<ChannelsAndPublishingStep> {
               fontWeight: FontWeight.w500,
             ),
       ),
+      subtitle: subtitle != null
+        ? Text(
+            subtitle,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(color: cs.onSurface.withOpacity(0.7)),
+          )
+        : null,
       trailing: trailing,
     ),
   );
@@ -524,7 +760,6 @@ class _StepDot extends StatelessWidget {
 
     final Color textColor = completed
         ? cs.secondary
-        //: (active ? cs.primary : null);
         : (active ? cs.primary : Theme.of(context).textTheme.bodySmall?.color ?? cs.onSurface);
 
     return Column(

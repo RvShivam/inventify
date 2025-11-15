@@ -1,3 +1,4 @@
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
@@ -18,10 +19,11 @@ class _AddNewProductScreenState extends State<AddNewProductScreen> {
 
   final _nameCtrl = TextEditingController();
   final _descCtrl = TextEditingController();
+  final _shortdescCtrl = TextEditingController();
   final _brandCtrl = TextEditingController();
   final _hsnCtrl = TextEditingController();
   final _countryCtrl = TextEditingController();
-  final _stockCtrl = TextEditingController();
+  final _skuCtrl = TextEditingController();
 
   String? _category;
 
@@ -89,9 +91,11 @@ class _AddNewProductScreenState extends State<AddNewProductScreen> {
   void dispose() {
     _nameCtrl.dispose();
     _descCtrl.dispose();
+    _shortdescCtrl.dispose();
     _brandCtrl.dispose();
     _hsnCtrl.dispose();
     _countryCtrl.dispose();
+    _skuCtrl.dispose();
     super.dispose();
   }
 
@@ -184,6 +188,16 @@ class _AddNewProductScreenState extends State<AddNewProductScreen> {
                       ),
                       const SizedBox(height: 14),
 
+                      _label('Short Description', textTheme, ),
+                      TextFormField(
+                        controller: _shortdescCtrl,
+                        maxLines: 2,
+                        decoration: const InputDecoration(
+                          hintText: 'Write a short product description…',
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+
                       // DESCRIPTION
                       _label('Description', textTheme, ),
                       TextFormField(
@@ -237,17 +251,13 @@ class _AddNewProductScreenState extends State<AddNewProductScreen> {
                           
                       const SizedBox(height: 12),
 
-                       _label('Stock', textTheme, required: true),
+                       _label('SKU', textTheme, required: true),
                       TextFormField(
-                        controller: _stockCtrl,
+                        controller: _skuCtrl,
                         textInputAction: TextInputAction.next,
-                        keyboardType: TextInputType.number,
-                        inputFormatters: [
-                         FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')) 
-  ],
                         decoration: const InputDecoration(
                         
-                          hintText: 'e.g., 10',
+                          hintText: 'e.g., TSH-ORG-001 ',
                         ),
                         validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
                       ),

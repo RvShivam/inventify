@@ -13,10 +13,10 @@ class AddProductStep2Screen extends StatefulWidget {
 class _AddProductStep2ScreenState extends State<AddProductStep2Screen> {
   final _formKey = GlobalKey<FormState>();
 
-  final _skuCtrl = TextEditingController();
+  
   final _mrpCtrl = TextEditingController();
   final _compareAtCtrl = TextEditingController();
-  final _barcodeCtrl = TextEditingController();
+  final _stockCtrl = TextEditingController();
   final _lenCtrl = TextEditingController();
   final _weightCtrl = TextEditingController();
   final _heigCtrl = TextEditingController();
@@ -25,10 +25,9 @@ class _AddProductStep2ScreenState extends State<AddProductStep2Screen> {
 
   @override
   void dispose() {
-    _skuCtrl.dispose();
     _mrpCtrl.dispose();
     _compareAtCtrl.dispose();
-    _barcodeCtrl.dispose();
+    _stockCtrl.dispose();
     _lenCtrl.dispose();
     _weightCtrl.dispose();
     _heigCtrl.dispose();
@@ -39,7 +38,6 @@ class _AddProductStep2ScreenState extends State<AddProductStep2Screen> {
   void _goNext() {
     if (_formKey.currentState!.validate()) {
       
-      // TODO: Navigate to Step 3 screen here
        Navigator.push(context, MaterialPageRoute(builder: (_) => const ChannelsAndPublishingStep()));
     }
   }
@@ -118,18 +116,6 @@ class _AddProductStep2ScreenState extends State<AddProductStep2Screen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      _requiredLabel(context, 'SKU'),
-                      TextFormField(
-                        controller: _skuCtrl,
-                        textInputAction: TextInputAction.next,
-                        decoration: const InputDecoration(
-                          hintText: 'e.g., TSH-ORG-001',
-                        ),
-                        validator: (v) =>
-                            (v == null || v.trim().isEmpty) ? 'Required' : null,
-                      ),
-                      const SizedBox(height: 12),
-
                       _requiredLabel(context, 'Price (MRP)'),
                       TextFormField(
                         controller: _mrpCtrl,
@@ -155,7 +141,7 @@ class _AddProductStep2ScreenState extends State<AddProductStep2Screen> {
                       ),
                       const SizedBox(height: 12),
 
-                      _label(context, 'Compare-at Price (Optional)'),
+                      _label(context, 'Sales Price (Optional)'),
                       TextFormField(
                         controller: _compareAtCtrl,
                         keyboardType: const TextInputType.numberWithOptions(
@@ -172,18 +158,35 @@ class _AddProductStep2ScreenState extends State<AddProductStep2Screen> {
                         ),
                       ),
                       const SizedBox(height: 12),
+                       _label(context, 'Currency'),
+Container(
+  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+  decoration: BoxDecoration(
+    color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(.25),
+    borderRadius: BorderRadius.circular(8),
+  ),
+  child: Text(
+    'Rupee (₹)',
+    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+          //fontWeight: FontWeight.w700,   // darker + bold
+          color: Theme.of(context).colorScheme.onSurface.withOpacity(.9),
+        ),
+  ),
+),
+const SizedBox(height: 12),
 
-                      _label(context, 'Barcode'),
+
+                      _requiredLabel(context, 'Stock Quantity'),
                       TextFormField(
-                        controller: _barcodeCtrl,
+                        controller: _stockCtrl,
                         keyboardType: TextInputType.number,
                         inputFormatters: [
                           FilteringTextInputFormatter.digitsOnly, // ✅ numbers only
                         ],
                         decoration: InputDecoration(
-                          hintText: 'Enter barcode',
-                          prefixIcon: Icon(Icons.qr_code_2, size: 20, color: cs.secondary),
+                          hintText: 'Eg:,10 ',
                         ),
+                        validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
                       ),
                       const SizedBox(height: 12),
                       
