@@ -3,185 +3,279 @@ package models
 import (
 	"time"
 
+	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
-// Product defines the master inventory item template.
+// ─────────────────────────────────────────────────────────────
+//						CATEGORIES
+// ─────────────────────────────────────────────────────────────
+
+// Category (Global predefined list)
+type Category struct {
+	gorm.Model
+	Name        string `gorm:"not null;index"` // human name (e.g., "Electronics")
+	Description string `gorm:"type:text"`
+}
+
+// CategoryMapping maps a global Category to a channel-specific category id.
+type CategoryMapping struct {
+	gorm.Model
+	CategoryID        uint   `gorm:"index;not null"`         // FK → Category.ID
+	Channel           string `gorm:"size:50;index;not null"` // 'woocommerce', 'ondc'
+	ChannelCategoryID string `gorm:"not null"`               // ID from Woo or ONDC
+	IsDefault         bool   `gorm:"default:false"`
+}
+
+// ─────────────────────────────────────────────────────────────
+// 						PRODUCT CORE
+// ─────────────────────────────────────────────────────────────
+
 type Product struct {
 	gorm.Model
-	OrganizationID      uint   `gorm:"not null;index"`
-	Name                string `gorm:"not null;index"`
-	Description         string `gorm:"type:text"`
-	Category            string `gorm:"not null;index"`
-	Brand               string `gorm:"not null;index"`
-	HSNCode             string `gorm:"size:8;index"`
-	CountryOfOrigin     string `gorm:"size:2"`
-	NetQuantity         string
-	NetQuantityUnit     string
-	ManufacturerName    string `gorm:"size:20"`
-	ManufacturerAddress string
-	PackerName          string `gorm:"size:20"`
-	PackerAddress       string
-	IsPublished         bool             `gorm:"default:false"`
-	Variants            []ProductVariant `gorm:"constraint:,OnDelete:CASCADE;"`
-	Images              []ProductImage   `gorm:"constraint:,OnDelete:CASCADE;"`
+
+	OrganizationID uint   `gorm:"index;not null"`
+	Name           string `gorm:"not null;index"`
+	//Slug           string `gorm:"index"`
+
+	ShortDescription string `gorm:"type:text"`
+	Description      string `gorm:"type:text"`
+
+	SKU string `gorm:"index"`
+	//Barcode string
+	Brand string
+
+	LocalCategoryID *uint     `gorm:"index;constraint:OnUpdate:CASCADE,OnDelete:SET NULL;"`
+	LocalCategory   *Category `gorm:"foreignKey:LocalCategoryID"`
+
+	RegularPrice float64  `gorm:"type:decimal(10,2);default:0;not null"`
+	SalePrice    *float64 `gorm:"type:decimal(10,2)"`
+
+	// Stock
+	ManageStock   bool `gorm:"default:true"`
+	StockQuantity int  `gorm:"default:0;not null"`
+
+	// Weight & Dimensions
+	WeightKg *float64
+	LengthCm *float64
+	WidthCm  *float64
+	HeightCm *float64
+
+	HSNCode         string
+	CountryOfOrigin string `gorm:"size:2;default:IN"`
+
+	IsFeatured     bool `gorm:"default:false"`
+	ReviewsAllowed bool `gorm:"default:true"`
+
+	Images            []ProductImage
+	ProductWoo        ProductWoo
+	ProductONDC       ProductONDC
+	ChannelOverrides  []ProductChannelOverride
+	ProductChannels   []ProductChannel
+	LocationStock     []ProductLocationStock
+	PublishLogs       []ChannelPublishLog
+	InventoryMovement []InventoryMovement
 }
 
 type ProductImage struct {
 	gorm.Model
-	ProductID uint   `gorm:"not null;index"`
-	ImageURL  string `gorm:"not null"`
-	AltText   string
-	Position  int
+	ProductID uint   `gorm:"index;not null;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
+	Src       string `gorm:"not null"`
+	Alt       string
+	Position  int  `gorm:"default:0"`
+	IsPrimary bool `gorm:"default:false"`
 }
 
-type ProductVariant struct {
-	gorm.Model
-	ProductID       uint    `gorm:"not null;index"`
-	SKU             string  `gorm:"unique;not null;index"`
-	Price           float64 `gorm:"not null"`
-	CompareAtPrice  float64
-	Barcode         string
-	Quantity        uint `gorm:"not null;default:0"`
-	Weight          float64
-	Length          float64
-	Width           float64
-	Height          float64
-	Attributes      VariantAttributes `gorm:"type:jsonb;serializer:json"`
-	ChannelProducts []ChannelProduct
-	Locations       []VariantLocation
-}
-
-type VariantAttributes struct {
-	Size     string            `json:"size,omitempty"`
-	Color    string            `json:"color,omitempty"`
-	Material string            `json:"material,omitempty"`
-	Custom   map[string]string `json:"custom,omitempty"`
-}
+//
+// ─────────────────────────────────────────────────────────────
+// CHANNELS (Normalized, every org has channels)
+// ─────────────────────────────────────────────────────────────
+//
 
 type Channel struct {
 	gorm.Model
-	OrganizationID uint   `gorm:"not null;index"`
-	Name           string `gorm:"not null"`
-	StoreURL       string
-	APIKey         string `gorm:"not null"`
-	APISecret      string
-	IsActive       bool `gorm:"default:true"`
-	Locations      []ChannelLocation
+	OrganizationID uint           `gorm:"index;not null"`
+	Name           string         `gorm:"size:50;not null"` // 'woocommerce', 'ondc'
+	Type           string         `gorm:"size:50;not null"` // 'ecommerce', 'ondc'
+	IsActive       bool           `gorm:"default:true"`
+	Config         datatypes.JSON `gorm:"type:jsonb"`
 }
 
-type ChannelMetadata struct {
-	TaxStatus        string   `json:"tax_status,omitempty"`
-	TaxClass         string   `json:"tax_class,omitempty"`
-	ShippingClass    string   `json:"shipping_class,omitempty"`
-	ProductType      string   `json:"product_type,omitempty"`
-	Tags             []string `json:"tags,omitempty"`
-	Collections      []string `json:"collections,omitempty"`
-	WarrantyType     string   `json:"warranty_type,omitempty"`
-	WarrantyDuration string   `json:"warranty_duration,omitempty"`
-	LeadTime         int      `json:"lead_time,omitempty"`
-}
-
-type ChannelProduct struct {
+// Pivot table to track product-channel activation
+type ProductChannel struct {
 	gorm.Model
-	ProductVariantID    uint   `gorm:"not null;index;uniqueIndex:idx_channel_variant"`
-	ChannelID           uint   `gorm:"not null;index;uniqueIndex:idx_channel_variant"`
-	ExternalProductID   string `gorm:"not null;index"`
-	ExternalVariantID   string `gorm:"index"`
-	ExternalInventoryID string
-	Handle              string
-	Price               float64
-	Published           bool
-	SyncStatus          string `gorm:"default:'pending';index"`
-	LastSyncedAt        *time.Time
-	SyncError           string          `gorm:"type:text"`
-	Metadata            ChannelMetadata `gorm:"type:jsonb;serializer:json"`
+	ProductID       uint `gorm:"index;not null;uniqueIndex:ux_product_channel"`
+	ChannelID       uint `gorm:"index;not null;uniqueIndex:ux_product_channel"`
+	IsEnabled       bool `gorm:"default:false"`
+	LastPublishedAt *time.Time
 }
 
-type Location struct {
+//
+// ─────────────────────────────────────────────────────────────
+// WOOCOMMERCE CONNECTION TABLES (Normalized)
+// ─────────────────────────────────────────────────────────────
+//
+
+type WooStore struct {
 	gorm.Model
-	OrganizationID uint   `gorm:"not null;index"`
-	Name           string `gorm:"not null"`
-	Address        string `gorm:"type:text;not null"`
+
+	OrganizationID          uint   `gorm:"index;not null"`
+	Name                    string `gorm:"not null"` // label
+	SiteURL                 string `gorm:"not null"`
+	ConsumerKeyEncrypted    string `gorm:"not null"`
+	ConsumerSecretEncrypted string `gorm:"not null"`
+	WebhookSecretEncrypted  string
+
+	VerifySSL bool `gorm:"default:true"`
+	IsActive  bool `gorm:"default:true"`
+	IsDefault bool `gorm:"default:false"`
+
+	LastSyncedAt *time.Time
+}
+
+type WooStoreWebhook struct {
+	gorm.Model
+	WooStoreID      uint   `gorm:"index;not null"`
+	WebhookID       string // Woo ID
+	Topic           string `gorm:"not null"`
+	DeliveryURL     string `gorm:"not null"`
+	SecretEncrypted string
+	Active          bool `gorm:"default:true"`
+	LastDelivered   *time.Time
+}
+
+//
+// ─────────────────────────────────────────────────────────────
+// PRODUCT → WOO OVERRIDES (Normalized 1-1 table)
+// ─────────────────────────────────────────────────────────────
+//
+
+type ProductWoo struct {
+	gorm.Model
+
+	ProductID uint `gorm:"uniqueIndex;not null"`
+
+	WooProductID      *int64
+	WooCategoryID     string
+	Status            string `gorm:"size:20;default:'draft'"`
+	Type              string `gorm:"size:20;default:'simple'"`
+	CatalogVisibility string `gorm:"size:20;default:'visible'"`
+	//SoldIndividually   bool   `gorm:"default:false"`
+	CustomPriceEnabled bool `gorm:"default:false"`
+	CustomPriceValue   *float64
+	LastPublishedAt    *time.Time
+}
+
+//
+// ─────────────────────────────────────────────────────────────
+// PRODUCT → ONDC OVERRIDES (Normalized 1-1 table)
+// ─────────────────────────────────────────────────────────────
+//
+
+type ProductONDC struct {
+	gorm.Model
+
+	ProductID uint `gorm:"uniqueIndex;not null"`
+
+	ONDCItemID     string
+	ONDCCategoryID string // mapped category id
+
+	FulfillmentType string `gorm:"size:20;not null"` // delivery/pickup/both
+	TimeToShip      string // ISO duration (P2D)
+	CityCode        string
+
+	Returnable  bool `gorm:"default:true"`
+	Cancellable bool `gorm:"default:true"`
+	Warranty    string
+
+	LastPublishedAt *time.Time
+}
+
+//
+// ─────────────────────────────────────────────────────────────
+// OVERRIDE JSON (for future channels/extensibility)
+// ─────────────────────────────────────────────────────────────
+//
+
+type ProductChannelOverride struct {
+	gorm.Model
+	ProductID uint           `gorm:"index;not null"`
+	Channel   string         `gorm:"size:50;not null"`
+	Data      datatypes.JSON `gorm:"type:jsonb"`
+}
+
+//
+// ─────────────────────────────────────────────────────────────
+// SELLER LOCATIONS (ONDC)
+// ─────────────────────────────────────────────────────────────
+//
+
+type SellerLocation struct {
+	gorm.Model
+
+	OrganizationID uint `gorm:"index;not null"`
+	Name           string
+	AddressLine1   string
+	AddressLine2   string
 	City           string
 	State          string
-	Pincode        string
-	Country        string `gorm:"default:'IN'"`
-	IsActive       bool   `gorm:"default:true"`
-	IsDefault      bool   `gorm:"default:false"`
+	Country        string `gorm:"size:2;default:IN"`
+	AreaCode       string
+	GPS            string
+	CityCode       string
+	Phone          string
+	IsActive       bool `gorm:"default:true"`
 }
 
-type VariantLocation struct {
+type ProductLocationStock struct {
 	gorm.Model
-	ProductVariantID uint `gorm:"not null;index;uniqueIndex:idx_variant_location"`
-	LocationID       uint `gorm:"not null;index;uniqueIndex:idx_variant_location"`
-	Quantity         uint `gorm:"not null;default:0"`
+	ProductID  uint `gorm:"index;not null"`
+	LocationID uint `gorm:"index;not null"`
+	StockQty   int  `gorm:"default:0"`
+	LastSynced *time.Time
 }
 
-type ChannelLocation struct {
-	gorm.Model
-	ChannelID  uint `gorm:"not null;index;uniqueIndex:idx_channel_location"`
-	LocationID uint `gorm:"not null;index;uniqueIndex:idx_channel_location"`
-	IsEnabled  bool `gorm:"default:true"`
+//
+// ─────────────────────────────────────────────────────────────
+// INVENTORY RESERVATION + MOVEMENT (optional normalized)
+// ─────────────────────────────────────────────────────────────
+//
+
+type InventoryReservation struct {
+	ID          string    `gorm:"primaryKey;type:uuid;default:gen_random_uuid()"`
+	ProductID   uint      `gorm:"index;not null"`
+	Source      string    `gorm:"size:64;not null"`
+	ContextID   string    `gorm:"not null;index"` // for idempotency
+	ReservedQty int       `gorm:"not null"`
+	Status      string    `gorm:"size:20;default:'reserved'"`
+	CreatedAt   time.Time `gorm:"autoCreateTime"`
+	ExpiresAt   *time.Time
+	Metadata    datatypes.JSON `gorm:"type:jsonb"`
 }
 
-// Orders and Webhooks Related Models
-type Order struct {
-	gorm.Model
-	OrganizationID  uint        `gorm:"not null;index"`
-	ChannelID       uint        `gorm:"not null;index"`
-	ExternalOrderID string      `gorm:"not null;index;uniqueIndex:idx_channel_order"`
-	OrderStatus     string      `gorm:"not null;default:'pending';index"`
-	OrderTotal      float64     `gorm:"not null"`
-	Currency        string      `gorm:"size:3;default:'INR'"`
-	CustomerEmail   string      `gorm:"index"`
-	OrderDetails    string      `gorm:"type:jsonb"`
-	OrderTime       time.Time   `gorm:"not null;index"`
-	OrderItems      []OrderItem `gorm:"constraint:OnDelete:CASCADE"`
+type InventoryMovement struct {
+	ID        string `gorm:"primaryKey;type:uuid;default:gen_random_uuid()"`
+	ProductID uint   `gorm:"index;not null"`
+	ChangeQty int    `gorm:"not null"`
+	Reason    string
+	Ref       string
+	CreatedAt time.Time `gorm:"autoCreateTime"`
 }
 
-// OrderItem stores line items per order.
-type OrderItem struct {
-	gorm.Model
-	OrderID          uint    `gorm:"not null;index"`
-	ProductVariantID uint    `gorm:"not null;index"`
-	Quantity         int     `gorm:"not null"`
-	Price            float64 `gorm:"not null"`
-	SKU              string
-}
+//
+// ─────────────────────────────────────────────────────────────
+// CHANNEL PUBLISH LOGS (Normalized)
+// ─────────────────────────────────────────────────────────────
+//
 
-// --- Sync, Webhooks, and Audit ---
-type SyncQueue struct {
+type ChannelPublishLog struct {
 	gorm.Model
-	ProductVariantID uint       `gorm:"not null;index"`
-	ChannelID        uint       `gorm:"not null;index"`
-	Action           string     `gorm:"not null"`
-	Payload          string     `gorm:"type:jsonb"`
-	Status           string     `gorm:"default:'pending';index"`
-	RetryCount       int        `gorm:"default:0"`
-	NextRetryAt      *time.Time `gorm:"index"`
-	ErrorMessage     string     `gorm:"type:text"`
-	CompletedAt      *time.Time
-}
-
-type WebhookEvent struct {
-	gorm.Model
-	ChannelID       uint   `gorm:"not null;index"`
-	ExternalEventID string `gorm:"unique;not null"`
-	EventType       string `gorm:"not null;index"`
-	Payload         string `gorm:"type:jsonb"`
-	ProcessedAt     *time.Time
-	Status          string `gorm:"default:'pending'"`
-	ErrorMessage    string `gorm:"type:text"`
-}
-
-// InventoryLog is a ledger of every stock change.
-type InventoryLog struct {
-	gorm.Model
-	ProductVariantID uint `gorm:"not null;index"`
-	LocationID       uint `gorm:"index"`
-	OrganizationID   uint `gorm:"not null;index"`
-	ChangeAmount     int
-	Reason           string
-	OrderID          uint `gorm:"index"`
+	ProductID         uint   `gorm:"index;not null"`
+	Channel           string `gorm:"size:50;not null"`
+	Success           bool   `gorm:"default:false"`
+	ChannelResourceID string
+	RequestPayload    datatypes.JSON `gorm:"type:jsonb"`
+	ResponsePayload   datatypes.JSON `gorm:"type:jsonb"`
+	ErrorMessage      string
+	AttemptAt         time.Time `gorm:"autoCreateTime"`
 }
