@@ -4,6 +4,7 @@ import 'package:inventify/features/dashboard/dashboard_screen.dart';
 import 'package:inventify/screens/setting_screen.dart';
 import 'package:inventify/screens/channel_screen.dart';
 import 'package:inventify/screens/products_screen.dart';
+import 'package:inventify/screens/order_screen.dart';
 
 // Placeholder for screens you haven't built yet
 class PlaceholderScreen extends StatelessWidget {
@@ -31,7 +32,7 @@ class _MainScreenState extends State<MainScreen> {
   final List<Widget> _screens = [
     const DashboardScreen(),
     const ProductsScreen(),
-    const PlaceholderScreen(title: 'Orders'),
+    const OrdersScreen(),
     const ChannelsBody(),
     const SettingsScreen(),
   ];

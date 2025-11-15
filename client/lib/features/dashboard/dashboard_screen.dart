@@ -18,9 +18,9 @@ class DashboardScreen extends StatelessWidget {
     ];
     
     final List<Map<String, dynamic>> recentOrdersData = [
-      {'title': 'Order #1082 - Handmade Scarf', 'subtitle': 'Shopify, 2m ago', 'amount': '\$25.00', 'color': colorScheme.secondary},
+      {'title': 'Order #1082 - Handmade Scarf', 'subtitle': 'CraftsVilla, 2m ago', 'amount': '\$25.00', 'color': colorScheme.secondary},
       {'title': 'Order #1081 - Clay Vase', 'subtitle': 'WooCommerce, 1h ago', 'amount': '\$40.00', 'color': colorScheme.secondary},
-      {'title': 'Order #1080 - Scented Candle', 'subtitle': 'Amazon, 3h ago', 'amount': '\$15.50', 'color': colorScheme.secondary},
+      {'title': 'Order #1080 - Scented Candle', 'subtitle': 'Mystore, 3h ago', 'amount': '\$15.50', 'color': colorScheme.secondary},
     ];
 
     return SingleChildScrollView(
