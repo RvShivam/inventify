@@ -15,36 +15,28 @@ func RunPostgresMigrations(db *gorm.DB) error {
 	}
 
 	migrations := []string{
+		// ───────────────────────────────────────────
 		// SKU uniqueness per organization
+		// ───────────────────────────────────────────
 		`CREATE UNIQUE INDEX IF NOT EXISTS ux_product_org_sku
 		 ON products (organization_id, sku)
 		 WHERE sku IS NOT NULL;`,
 
-		// ProductChannel uniqueness
-		`DO $$
-		BEGIN
-		  IF NOT EXISTS (
-		    SELECT 1 FROM pg_constraint WHERE conname = 'ux_product_channel'
-		  ) THEN
-		    ALTER TABLE product_channels
-		      ADD CONSTRAINT ux_product_channel UNIQUE (product_id, channel_id);
-		  END IF;
-		EXCEPTION WHEN duplicate_object THEN
-		END$$;`,
+		// ───────────────────────────────────────────
+		// ProductChannel uniqueness (replace CONSTRAINT with INDEX)
+		// ───────────────────────────────────────────
+		`CREATE UNIQUE INDEX IF NOT EXISTS ux_product_channel
+		 ON product_channels (product_id, channel_id);`,
 
+		// ───────────────────────────────────────────
 		// CategoryMapping uniqueness
-		`DO $$
-		BEGIN
-		  IF NOT EXISTS (
-		    SELECT 1 FROM pg_constraint WHERE conname = 'ux_category_channel'
-		  ) THEN
-		    ALTER TABLE category_mappings
-		      ADD CONSTRAINT ux_category_channel UNIQUE (category_id, channel);
-		  END IF;
-		EXCEPTION WHEN duplicate_object THEN
-		END$$;`,
+		// ───────────────────────────────────────────
+		`CREATE UNIQUE INDEX IF NOT EXISTS ux_category_channel
+		 ON category_mappings (category_id, channel);`,
 
-		// Non-negative prices & stock
+		// ───────────────────────────────────────────
+		// Non-negative prices & stock (keep CHECK constraints)
+		// ───────────────────────────────────────────
 		`DO $$
 		BEGIN
 		  IF NOT EXISTS (
@@ -78,17 +70,11 @@ func RunPostgresMigrations(db *gorm.DB) error {
 		EXCEPTION WHEN duplicate_object THEN
 		END$$;`,
 
-		// Inventory reservation safety
-		`DO $$
-		BEGIN
-		  IF NOT EXISTS (
-		    SELECT 1 FROM pg_constraint WHERE conname = 'ux_reservation_product_context'
-		  ) THEN
-		    ALTER TABLE inventory_reservations
-		      ADD CONSTRAINT ux_reservation_product_context UNIQUE (product_id, context_id);
-		  END IF;
-		EXCEPTION WHEN duplicate_object THEN
-		END$$;`,
+		// ───────────────────────────────────────────
+		// Inventory reservation idempotency + safety
+		// ───────────────────────────────────────────
+		`CREATE UNIQUE INDEX IF NOT EXISTS ux_reservation_product_context
+		 ON inventory_reservations (product_id, context_id);`,
 
 		`DO $$
 		BEGIN
@@ -101,9 +87,14 @@ func RunPostgresMigrations(db *gorm.DB) error {
 		EXCEPTION WHEN duplicate_object THEN
 		END$$;`,
 
+		// ───────────────────────────────────────────
 		// Helpful indexes
-		`CREATE INDEX IF NOT EXISTS idx_product_category ON products (local_category_id);`,
-		`CREATE INDEX IF NOT EXISTS idx_publish_product_channel ON channel_publish_logs (product_id, channel);`,
+		// ───────────────────────────────────────────
+		`CREATE INDEX IF NOT EXISTS idx_product_category
+		 ON products (local_category_id);`,
+
+		`CREATE INDEX IF NOT EXISTS idx_publish_product_channel
+		 ON channel_publish_logs (product_id, channel);`,
 	}
 
 	for _, sql := range migrations {

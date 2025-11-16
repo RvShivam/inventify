@@ -116,39 +116,47 @@ class _AddChannelPageState extends State<AddChannelPage> {
           child: TextFormField(
             controller: _wooUrlCtl,
             keyboardType: TextInputType.url,
-            decoration: const InputDecoration(hintText: 'https://example.com'),
+            decoration: const InputDecoration(
+              hintText: 'https://yourstore.com',
+            ),
             validator: (v) {
               if (v == null || v.trim().isEmpty) return 'Enter shop URL';
+              if (!v.startsWith('https://')) return 'Store URL must use HTTPS';
               return null;
             },
           ),
           helpTitle: 'Shop URL',
-          helpText: 'Enter your store base URL.',
+          helpText: 'Enter your WooCommerce store URL (must be HTTPS).',
         ),
         const SizedBox(height: 10),
+
         _fieldWithHelp(
           label: 'Consumer Key',
           child: TextFormField(
             controller: _wooKeyCtl,
             decoration: const InputDecoration(hintText: 'ck_xxx...'),
-            validator: (v) => (v == null || v.trim().isEmpty) ? 'Enter consumer key' : null,
+            validator: (v) => 
+                (v == null || v.trim().isEmpty) ? 'Enter consumer key' : null,
           ),
           helpTitle: 'Consumer Key',
-          helpText: 'Generated from WooCommerce REST API.',
+          helpText: 'Generated in WooCommerce → Settings → Advanced → REST API.',
         ),
         const SizedBox(height: 10),
+
         _fieldWithHelp(
           label: 'Consumer Secret',
           child: TextFormField(
             controller: _wooSecretCtl,
             decoration: const InputDecoration(hintText: 'cs_xxx...'),
             obscureText: true,
-            validator: (v) => (v == null || v.trim().isEmpty) ? 'Enter consumer secret' : null,
+            validator: (v) => 
+                (v == null || v.trim().isEmpty) ? 'Enter consumer secret' : null,
           ),
           helpTitle: 'Consumer Secret',
-          helpText: 'Generated alongside the consumer key.',
+          helpText: 'Generated along with the key. Must have Read/Write permission.',
         ),
-        const SizedBox(height: 14),
+
+        const SizedBox(height: 20),
         SizedBox(
           width: double.infinity,
           child: ElevatedButton(
