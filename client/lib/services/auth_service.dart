@@ -1,52 +1,90 @@
+// lib/services/auth_service.dart
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:inventify/services/token_store.dart'; // <-- adjust path
 
 class AuthService {
-  // For iOS emulator or web, use localhost. For Android emulator, use 10.0.2.2
-  final String _baseUrl = 'http://localhost:8080';
+  /// Base URL for backend. Use 10.0.2.2 for Android emulator.
+  final String baseUrl;
 
+  AuthService({String? baseUrl})
+      : baseUrl = baseUrl ?? 'http://localhost:8080'; // override in tests or when constructing
+
+  Uri _uri(String path) => Uri.parse(baseUrl + path);
+
+  /// Signup: returns true on success, throws Exception on failure with message.
   Future<bool> signup({
     required String name,
     required String email,
     required String password,
     required String shopName,
-    required String referralCode, 
+    String? referralCode,
   }) async {
-    final response = await http.post(
-      Uri.parse('$_baseUrl/signup'),
+    final resp = await http.post(
+      _uri('/signup'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({
         'name': name,
         'email': email,
         'password': password,
         'shopName': shopName,
-        'referralCode': referralCode, 
+        if (referralCode != null) 'referralCode': referralCode,
       }),
     );
-    
-    if (response.statusCode != 201) {
-      // Try to parse the error message from the server
-      final errorData = jsonDecode(response.body);
-      throw Exception(errorData['error'] ?? 'Signup failed.');
+
+    if (resp.statusCode == 201 || resp.statusCode == 200) {
+      return true;
     }
-    
-    return true;
+
+    // try to parse error body
+    try {
+      final body = jsonDecode(resp.body);
+      final msg = (body is Map && (body['error'] ?? body['message']) != null)
+          ? (body['error'] ?? body['message']).toString()
+          : 'Signup failed (${resp.statusCode})';
+      throw Exception(msg);
+    } catch (e) {
+      throw Exception('Signup failed (${resp.statusCode}): ${resp.reasonPhrase}');
+    }
   }
 
-  Future<String?> login({
+  /// Login: returns token string on success and optionally persists it.
+  /// Throws Exception with backend message on failure.
+  Future<String> login({
     required String email,
     required String password,
+    bool persistToken = true,
   }) async {
-    final response = await http.post(
-      Uri.parse('$_baseUrl/login'),
+    final resp = await http.post(
+      _uri('/login'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({'email': email, 'password': password}),
     );
 
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      return data['token'];
+    if (resp.statusCode == 200) {
+      final body = jsonDecode(resp.body);
+      final token = body['token'] as String?;
+      if (token == null || token.isEmpty) {
+        throw Exception('Login succeeded but no token returned');
+      }
+      if (persistToken) {
+        await TokenStore.saveToken(token);
+      }
+      return token;
     }
-    return null;
+
+    try {
+      final body = jsonDecode(resp.body);
+      final msg = (body is Map && (body['error'] ?? body['message']) != null)
+          ? (body['error'] ?? body['message']).toString()
+          : 'Login failed (${resp.statusCode})';
+      throw Exception(msg);
+    } catch (e) {
+      throw Exception('Login failed (${resp.statusCode}): ${resp.reasonPhrase}');
+    }
+  }
+
+  Future<void> logout() async {
+    await TokenStore.clear();
   }
 }

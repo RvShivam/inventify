@@ -1,4 +1,7 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:inventify/services/woo_service.dart'; 
+import 'package:inventify/services/token_store.dart'; 
 
 enum ChannelType { woocommerce, ondc }
 
@@ -23,6 +26,12 @@ class _AddChannelPageState extends State<AddChannelPage> {
   final _ondcSellerCtl = TextEditingController();
 
   final _formKey = GlobalKey<FormState>();
+
+  // Service + state
+  final WooService _wooService = WooService(
+    baseUrl: 'http://10.0.2.2:8080', // change to localhost for iOS / web
+  );
+  bool _loading = false;
 
   @override
   void dispose() {
@@ -135,8 +144,7 @@ class _AddChannelPageState extends State<AddChannelPage> {
           child: TextFormField(
             controller: _wooKeyCtl,
             decoration: const InputDecoration(hintText: 'ck_xxx...'),
-            validator: (v) => 
-                (v == null || v.trim().isEmpty) ? 'Enter consumer key' : null,
+            validator: (v) => (v == null || v.trim().isEmpty) ? 'Enter consumer key' : null,
           ),
           helpTitle: 'Consumer Key',
           helpText: 'Generated in WooCommerce → Settings → Advanced → REST API.',
@@ -149,8 +157,7 @@ class _AddChannelPageState extends State<AddChannelPage> {
             controller: _wooSecretCtl,
             decoration: const InputDecoration(hintText: 'cs_xxx...'),
             obscureText: true,
-            validator: (v) => 
-                (v == null || v.trim().isEmpty) ? 'Enter consumer secret' : null,
+            validator: (v) => (v == null || v.trim().isEmpty) ? 'Enter consumer secret' : null,
           ),
           helpTitle: 'Consumer Secret',
           helpText: 'Generated along with the key. Must have Read/Write permission.',
@@ -160,8 +167,10 @@ class _AddChannelPageState extends State<AddChannelPage> {
         SizedBox(
           width: double.infinity,
           child: ElevatedButton(
-            onPressed: _submit,
-            child: const Text('Connect WooCommerce'),
+            onPressed: _loading ? null : _submit,
+            child: _loading
+                ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                : const Text('Connect WooCommerce'),
           ),
         ),
       ],
@@ -209,8 +218,10 @@ class _AddChannelPageState extends State<AddChannelPage> {
         SizedBox(
           width: double.infinity,
           child: ElevatedButton(
-            onPressed: _submit,
-            child: const Text('Connect ONDC'),
+            onPressed: _loading ? null : _submit,
+            child: _loading
+                ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                : const Text('Connect ONDC'),
           ),
         ),
       ],
@@ -255,7 +266,7 @@ class _AddChannelPageState extends State<AddChannelPage> {
   }
 
   // ---------------------- SUBMIT ----------------------
-  void _submit() {
+  void _submit() async {
     if (_selected == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please select a channel first.')),
@@ -265,12 +276,53 @@ class _AddChannelPageState extends State<AddChannelPage> {
 
     if (!_formKey.currentState!.validate()) return;
 
-    if (_selected == ChannelType.woocommerce) {
-      debugPrint('Connect WooCommerce: ${_wooUrlCtl.text} | ${_wooKeyCtl.text}');
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('WooCommerce connected (demo).')));
-    } else {
-      debugPrint('Connect ONDC: ${_ondcRegistryCtl.text} | ${_ondcBuyerCtl.text}');
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('ONDC connected (demo).')));
+    setState(() => _loading = true);
+
+    try {
+      final token = await TokenStore.getToken();
+      if (token == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please log in before connecting a channel.')),
+        );
+        setState(() => _loading = false);
+        return;
+      }
+
+      if (_selected == ChannelType.woocommerce) {
+        final site = _wooUrlCtl.text.trim();
+        final key = _wooKeyCtl.text.trim();
+        final secret = _wooSecretCtl.text.trim();
+
+        // call the backend
+        final store = await _wooService.createWooStore(
+          token: token,
+          siteUrl: site,
+          consumerKey: key,
+          consumerSecret: secret,
+          verifySSL: true,
+        );
+
+        final id = store['id'] ?? store['result'] ?? 'unknown';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('WooCommerce store connected (id: $id)')),
+        );
+
+        // close and signal success
+        if (mounted) Navigator.of(context).pop(true);
+
+      } else {
+        // For ONDC: integrate your ONDC service call here. For now demo:
+        final registry = _ondcRegistryCtl.text.trim();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('ONDC connected (registry: $registry)')),
+        );
+        if (mounted) Navigator.of(context).pop(true);
+      }
+    } catch (e) {
+      final msg = (e is Exception) ? e.toString() : 'Failed to connect';
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+    } finally {
+      if (mounted) setState(() => _loading = false);
     }
   }
 
