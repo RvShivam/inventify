@@ -12,6 +12,8 @@ class AddChannelPage extends StatefulWidget {
   State<AddChannelPage> createState() => _AddChannelPageState();
 }
 
+// TODO: Only Allow user whose role permits channel addition ( user is admin), role = 1
+// This can be done by checking the role from TokenStore
 class _AddChannelPageState extends State<AddChannelPage> {
   ChannelType? _selected;
 
@@ -29,7 +31,7 @@ class _AddChannelPageState extends State<AddChannelPage> {
 
   // Service + state
   final WooService _wooService = WooService(
-    baseUrl: 'http://10.0.2.2:8080', // change to localhost for iOS / web
+    baseUrl: 'http://localhost:8080', // change to localhost for iOS / web
   );
   bool _loading = false;
 

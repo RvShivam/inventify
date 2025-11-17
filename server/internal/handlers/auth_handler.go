@@ -3,14 +3,15 @@ package handlers
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"net/http"
+	"os"
+	"time"
+
 	"github.com/RvShivam/inventify/internal/models"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
-	"net/http"
-	"os"
-	"time"
 )
 
 func generateReferralCode(length int) (string, error) {
@@ -109,12 +110,14 @@ type LoginRequest struct {
 }
 
 // generateJWT creates a new JWT token for a given user
-func generateJWT(user models.User) (string, error) {
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		"sub": user.ID,
-		"exp": time.Now().Add(time.Hour * 24 * 30).Unix(), // Token expires in 30 days
-	})
+func generateJWT(user models.User, orgID uint) (string, error) {
+	claims := jwt.MapClaims{
+		"sub":    user.ID,
+		"org_id": orgID,
+		"exp":    time.Now().Add(30 * 24 * time.Hour).Unix(),
+	}
 
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	return token.SignedString([]byte(os.Getenv("JWT_SECRET")))
 }
 
@@ -127,26 +130,43 @@ func Login(db *gorm.DB) gin.HandlerFunc {
 			return
 		}
 
-		// Find the user by email
 		var user models.User
 		if err := db.Where("email = ?", req.Email).First(&user).Error; err != nil {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid email or password"})
 			return
 		}
 
-		// Compare the provided password with the stored hash
 		if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.Password)); err != nil {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid email or password"})
 			return
 		}
 
-		// Generate a JWT
-		tokenString, err := generateJWT(user)
+		// Find the user's organization (prefer owner role)
+		var member models.OrganizationMember
+		orgID := uint(0)
+
+		// First preference: Owner
+		if err := db.Where("user_id = ? AND role_id = ?", user.ID, 1).First(&member).Error; err == nil {
+			orgID = member.OrganizationID
+		} else {
+			// fallback: any membership
+			if err := db.Where("user_id = ?", user.ID).First(&member).Error; err == nil {
+				orgID = member.OrganizationID
+			}
+		}
+
+		// Generate token
+		tokenString, err := generateJWT(user, orgID)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate token"})
 			return
 		}
 
-		c.JSON(http.StatusOK, gin.H{"token": tokenString})
+		c.JSON(http.StatusOK, gin.H{
+			"token":  tokenString,
+			"orgId":  orgID,
+			"userId": user.ID,
+			"roleId": member.RoleID,
+		})
 	}
 }

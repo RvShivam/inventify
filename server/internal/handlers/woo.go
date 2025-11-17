@@ -74,6 +74,7 @@ func CreateWooStore(db *gorm.DB) gin.HandlerFunc {
 		appKey := []byte(os.Getenv("APP_SECRET_KEY"))
 		ckEnc, err := crypto.Encrypt(req.ConsumerKey, appKey)
 		if err != nil {
+			log.Printf("ERROR encrypting consumer key: %v", err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "encryption failed"})
 			return
 		}
@@ -360,7 +361,7 @@ func randomSecret(n int) string {
 // ptrTime helper
 func ptrTime(t time.Time) *time.Time { return &t }
 
-// getOrgIDFromContext is placeholder — implement based on your auth middleware
+// getOrgIDFromContext
 func getOrgIDFromContext(c *gin.Context) (uint, bool) {
 	// Example: middleware might set "org_id" in context
 	v, ok := c.Get("org_id")

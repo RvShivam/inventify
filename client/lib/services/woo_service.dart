@@ -2,6 +2,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
+import 'package:inventify/services/token_store.dart';
 
 /// WooService - handles connecting a WooCommerce store with the backend.
 ///
@@ -16,12 +17,24 @@ class WooService {
   })  : _baseUrl = baseUrl ?? 'http://localhost:8080',
         _timeout = timeout ?? const Duration(seconds: 15);
 
-  Map<String, String> _authHeaders(String token) => {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'Authorization': 'Bearer $token',
-      };
+  /// Builds headers including Token + Organization ID
+  Future<Map<String, String>> _authHeaders(String token) async {
+    final orgId = await TokenStore.getOrgId();
 
+    final headers = <String, String>{
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+      'Authorization': 'Bearer $token',
+    };
+
+    if (orgId != null && orgId > 0) {
+      headers['x-organization-id'] = orgId.toString();
+    }
+
+    return headers;
+  }
+
+  /// Create a new WooCommerce store
   Future<Map<String, dynamic>> createWooStore({
     required String token,
     required String siteUrl,
@@ -30,7 +43,7 @@ class WooService {
     bool verifySSL = true,
     String? name,
   }) async {
-    final uri = Uri.parse('$_baseUrl/woo_stores');
+    final uri = Uri.parse('$_baseUrl/api/woo_stores');
     final body = jsonEncode({
       'site_url': siteUrl,
       'consumer_key': consumerKey,
@@ -41,8 +54,9 @@ class WooService {
 
     http.Response resp;
     try {
+      final headers = await _authHeaders(token);
       resp = await http
-          .post(uri, headers: _authHeaders(token), body: body)
+          .post(uri, headers: headers, body: body)
           .timeout(_timeout);
     } on SocketException catch (e) {
       throw Exception('Network error: ${e.message}');
@@ -56,19 +70,17 @@ class WooService {
       if (resp.body.isEmpty) return <String, dynamic>{};
       try {
         final data = jsonDecode(resp.body);
-        if (data is Map<String, dynamic>) return data;
-        return {'result': data};
-      } catch (e) {
-        // non-json success response
+        return data is Map<String, dynamic> ? data : {'result': data};
+      } catch (_) {
         return {'result': resp.body};
       }
     }
 
-    // error handling: try parsing JSON error message
     final parsedMsg = _parseErrorMessage(resp);
     throw Exception(parsedMsg ?? 'Create store failed (${resp.statusCode})');
   }
 
+  /// Test a WooCommerce store connection
   Future<bool> testWooStore({
     required String token,
     required int storeId,
@@ -77,7 +89,10 @@ class WooService {
 
     http.Response resp;
     try {
-      resp = await http.post(uri, headers: _authHeaders(token)).timeout(_timeout);
+      final headers = await _authHeaders(token);
+      resp = await http
+          .post(uri, headers: headers)
+          .timeout(_timeout);
     } on SocketException catch (e) {
       throw Exception('Network error: ${e.message}');
     } on Exception catch (e) {
@@ -90,6 +105,7 @@ class WooService {
     throw Exception(parsedMsg ?? 'Test store failed (${resp.statusCode})');
   }
 
+  /// Register WooCommerce webhooks
   Future<Map<String, dynamic>> registerWebhooks({
     required String token,
     required int storeId,
@@ -97,14 +113,17 @@ class WooService {
     List<String>? topics,
   }) async {
     final uri = Uri.parse('$_baseUrl/api/woo_stores/$storeId/webhooks');
-    final payload = <String, dynamic>{};
-    if (deliveryUrl != null) payload['delivery_url'] = deliveryUrl;
-    if (topics != null) payload['topics'] = topics;
+
+    final payload = <String, dynamic>{
+      if (deliveryUrl != null) 'delivery_url': deliveryUrl,
+      if (topics != null) 'topics': topics,
+    };
 
     http.Response resp;
     try {
+      final headers = await _authHeaders(token);
       resp = await http
-          .post(uri, headers: _authHeaders(token), body: jsonEncode(payload))
+          .post(uri, headers: headers, body: jsonEncode(payload))
           .timeout(_timeout);
     } on SocketException catch (e) {
       throw Exception('Network error: ${e.message}');
@@ -117,7 +136,7 @@ class WooService {
       try {
         final data = jsonDecode(resp.body);
         return data is Map<String, dynamic> ? data : {'result': data};
-      } catch (e) {
+      } catch (_) {
         return {'result': resp.body};
       }
     }
@@ -126,18 +145,18 @@ class WooService {
     throw Exception(parsedMsg ?? 'Register webhooks failed (${resp.statusCode})');
   }
 
+  /// Safe JSON error parser
   String? _parseErrorMessage(http.Response resp) {
     if (resp.body.isEmpty) return null;
     try {
-      final err = jsonDecode(resp.body);
-      if (err is Map) {
-        if (err['error'] != null) return err['error'].toString();
-        if (err['message'] != null) return err['message'].toString();
+      final decoded = jsonDecode(resp.body);
+      if (decoded is Map) {
+        if (decoded['error'] != null) return decoded['error'].toString();
+        if (decoded['message'] != null) return decoded['message'].toString();
       }
-      return err.toString();
+      return decoded.toString();
     } catch (_) {
-      // not JSON
-      return resp.body;
+      return resp.body; // not JSON
     }
   }
 }

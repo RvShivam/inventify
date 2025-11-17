@@ -35,18 +35,22 @@ func RequireAuth(c *gin.Context) {
 	})
 
 	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
-		// Check if the token is expired
 		if float64(time.Now().Unix()) > claims["exp"].(float64) {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Token has expired"})
 			return
 		}
 
-		// Extract the user ID and attach it to the request context
+		// userId
 		userID := uint(claims["sub"].(float64))
 		c.Set("userId", userID)
 
-		// Continue to the next handler
+		// orgId
+		if org, ok := claims["org_id"]; ok {
+			c.Set("orgId", uint(org.(float64)))
+		}
+
 		c.Next()
+		return
 	} else {
 		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Invalid token", "details": err.Error()})
 	}

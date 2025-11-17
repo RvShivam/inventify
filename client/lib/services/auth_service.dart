@@ -1,7 +1,7 @@
 // lib/services/auth_service.dart
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import 'package:inventify/services/token_store.dart'; // <-- adjust path
+import 'package:inventify/services/token_store.dart'; 
 
 class AuthService {
   /// Base URL for backend. Use 10.0.2.2 for Android emulator.
@@ -49,6 +49,7 @@ class AuthService {
   }
 
   /// Login: returns token string on success and optionally persists it.
+  /// Also persists orgId (if present) into TokenStore.
   /// Throws Exception with backend message on failure.
   Future<String> login({
     required String email,
@@ -63,13 +64,34 @@ class AuthService {
 
     if (resp.statusCode == 200) {
       final body = jsonDecode(resp.body);
+
+      // token
       final token = body['token'] as String?;
       if (token == null || token.isEmpty) {
         throw Exception('Login succeeded but no token returned');
       }
+
+      // orgId may be returned as: int, string, or absent
+      final dynamic rawOrg = body['orgId'] ?? body['org_id'];
+      int? orgId = _parseOrgId(rawOrg);
+
       if (persistToken) {
         await TokenStore.saveToken(token);
+
+        if (orgId != null && orgId > 0) {
+          await TokenStore.saveOrgId(orgId);
+        }
+
+        if (body['userId'] != null) {
+          await TokenStore.saveUserId(body['userId']);
+        }
+
+        if (body['roleId'] != null) {
+          await TokenStore.saveRoleId(body['roleId']);
+        }
       }
+
+
       return token;
     }
 
@@ -86,5 +108,17 @@ class AuthService {
 
   Future<void> logout() async {
     await TokenStore.clear();
+  }
+
+  // Helper: parse orgId from dynamic response value
+  int? _parseOrgId(dynamic raw) {
+    if (raw == null) return null;
+    if (raw is int) return raw;
+    if (raw is double) return raw.toInt();
+    if (raw is String) {
+      final parsed = int.tryParse(raw);
+      return parsed;
+    }
+    return null;
   }
 }

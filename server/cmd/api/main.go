@@ -82,7 +82,16 @@ func main() {
 	// Router & routes
 	router := gin.Default()
 	// Consider restricting CORS origins in production
-	router.Use(cors.Default())
+	config := cors.DefaultConfig()
+
+	// 1. This is the key change to allow everything
+	config.AllowAllOrigins = true
+
+	// 2. You still need to specify the headers and methods
+	config.AllowHeaders = []string{"Origin", "Content-Type", "Accept", "Authorization", "x-organization-id"}
+	config.AllowMethods = []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"}
+
+	router.Use(cors.New(config))
 
 	// public auth endpoints
 	router.POST("/signup", handlers.Signup(dbconn))
