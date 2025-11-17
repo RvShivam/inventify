@@ -6,7 +6,8 @@ class ChannelsBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final t = Theme.of(context).textTheme;
+    // TODO: Only Allow user whose role permits channel addition ( user is admin), role = 1
+    // This can be done by checking the role from TokenStore
 
     return SafeArea(
       top: false, // AppBar is in MainScreen, so no extra top padding

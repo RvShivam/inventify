@@ -12,8 +12,7 @@ class AddChannelPage extends StatefulWidget {
   State<AddChannelPage> createState() => _AddChannelPageState();
 }
 
-// TODO: Only Allow user whose role permits channel addition ( user is admin), role = 1
-// This can be done by checking the role from TokenStore
+
 class _AddChannelPageState extends State<AddChannelPage> {
   ChannelType? _selected;
 
