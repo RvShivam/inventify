@@ -1,16 +1,15 @@
 import 'package:flutter/material.dart';
 import 'add_new_channel.dart';
+import 'package:inventify/services/token_store.dart';
 
 class ChannelsBody extends StatelessWidget {
   const ChannelsBody({super.key});
 
   @override
   Widget build(BuildContext context) {
-    // TODO: Only Allow user whose role permits channel addition ( user is admin), role = 1
-    // This can be done by checking the role from TokenStore
-
+    
     return SafeArea(
-      top: false, // AppBar is in MainScreen, so no extra top padding
+      top: false,
       child: ListView(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
         children: [
@@ -19,60 +18,48 @@ class ChannelsBody extends StatelessWidget {
             subtitle: 'Manage your store integrations',
           ),
           const SizedBox(height: 12),
+          // --- KEY LOGIC: FutureBuilder to check Role ID upon interaction ---
+          FutureBuilder<int?>(
+            future: TokenStore.getRoleId(),
+            builder: (context, snapshot) {
+              
 
-          ChannelCard(
-            leadingMonogram: 'S',
-            storeName: 'Main Store',
-            platformName: 'Shopify',
-            ordersText: '45 orders',
-            status: ChannelStatus.connected,
-            revenue: '\$1,125',
-            onTap: () {},
-          ),
-          const SizedBox(height: 10),
-          ChannelCard(
-            leadingMonogram: 'W',
-            storeName: 'Marketplace',
-            platformName: 'WooCommerce',
-            ordersText: '37 orders',
-            status: ChannelStatus.connected,
-            revenue: '\$925',
-            onTap: () {},
-          ),
-          const SizedBox(height: 10),
-          ChannelCard(
-            leadingMonogram: 'IG',
-            storeName: 'Social Store',
-            platformName: 'Instagram Shop',
-            ordersText: '12 orders',
-            status: ChannelStatus.syncing,
-            revenue: '\$280',
-            onTap: () {},
-          ),
-          const SizedBox(height: 10),
-          ChannelCard(
-            leadingMonogram: 'B2B',
-            storeName: 'B2B Portal',
-            platformName: 'Custom',
-            ordersText: '0 orders',
-            status: ChannelStatus.disconnected,
-            revenue: '\$0',
-            onTap: () {},
-          ),
+              // 1. Show loading placeholder for the card action
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return _AddNewChannelCard(
+                  onConnect: () {}, 
+                );
+              }
 
-          const SizedBox(height: 16),
+              final roleId = snapshot.data;
+              final isAdmin = roleId == 1;
 
-          _AddNewChannelCard(
-            onConnect: () {
-              // TODO: open your connect-channel flow
-              Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const AddChannelPage()),
-    );
+              return _AddNewChannelCard(
+                onConnect: () {
+                  if (isAdmin) {
+                    // Admin: Proceed to the Add Channel Page
+                    Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const AddChannelPage()),
+                    );
+                  } else {
+
+                     showDialog(
+                       context: context,
+                       builder: (context) => AlertDialog(
+                         title: const Text('Access Denied'),
+                         content: const Text('Only admin can add channel.'),
+                         actions: [
+                           TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('OK')),
+                         ],
+                       ),
+                     );
+                  }
+                },
+              );
             },
           ),
 
           const SizedBox(height: 12),
-         
         ],
       ),
     );
@@ -81,6 +68,7 @@ class ChannelsBody extends StatelessWidget {
 
 /* ==== Section Header ==== */
 class _SectionHeader extends StatelessWidget {
+
   final String title;
   final String subtitle;
   const _SectionHeader({required this.title, required this.subtitle});
@@ -198,6 +186,7 @@ class ChannelCard extends StatelessWidget {
 
 /* ==== Monogram Badge ==== */
 class _MonogramBadge extends StatelessWidget {
+
   final String text;
   const _MonogramBadge({required this.text});
 
@@ -227,6 +216,7 @@ class _MonogramBadge extends StatelessWidget {
 
 /* ==== Platform Badge ==== */
 class PlatformBadge extends StatelessWidget {
+
   final String text;
   const PlatformBadge({required this.text});
 
@@ -255,6 +245,7 @@ class PlatformBadge extends StatelessWidget {
 
 /* ==== Status Chip ==== */
 class StatusChip extends StatelessWidget {
+
   final ChannelStatus status;
   const StatusChip({required this.status});
 
@@ -316,6 +307,7 @@ class StatusChip extends StatelessWidget {
 
 /* ==== Add New Channel Card ==== */
 class _AddNewChannelCard extends StatelessWidget {
+
   final VoidCallback onConnect;
   const _AddNewChannelCard({required this.onConnect});
 
