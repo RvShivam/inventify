@@ -363,8 +363,8 @@ func ptrTime(t time.Time) *time.Time { return &t }
 
 // getOrgIDFromContext
 func getOrgIDFromContext(c *gin.Context) (uint, bool) {
-	// Example: middleware might set "org_id" in context
-	v, ok := c.Get("org_id")
+
+	v, ok := c.Get("org_Id")
 	if !ok {
 		return 0, false
 	}

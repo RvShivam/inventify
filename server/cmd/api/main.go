@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 	"os"
+	"time"
 
 	"github.com/RvShivam/inventify/internal/db"
 	"github.com/RvShivam/inventify/internal/events"
@@ -81,15 +82,17 @@ func main() {
 
 	// Router & routes
 	router := gin.Default()
-	// Consider restricting CORS origins in production
-	config := cors.DefaultConfig()
 
-	// 1. This is the key change to allow everything
-	config.AllowAllOrigins = true
-
-	// 2. You still need to specify the headers and methods
-	config.AllowHeaders = []string{"Origin", "Content-Type", "Accept", "Authorization", "x-organization-id"}
-	config.AllowMethods = []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"}
+	// CORS config — allow your dev frontend origin and required headers
+	config := cors.Config{
+		// Change this to the exact origin(s) your frontend uses in dev
+		AllowOrigins:     []string{"http://localhost:56705"},
+		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization", "X-Organization-Id"},
+		ExposeHeaders:    []string{"Content-Length"},
+		AllowCredentials: true, // IMPORTANT: allow cookies / auth headers in cross-origin requests
+		MaxAge:           12 * time.Hour,
+	}
 
 	router.Use(cors.New(config))
 
