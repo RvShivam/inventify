@@ -199,8 +199,22 @@ func InternalRegisterWebhooks(db *gorm.DB) gin.HandlerFunc {
 			secret := randomSecret(32)
 			webhookID, err := createWooWebhook(store.SiteURL, ck, cs, deliveryURL, topic, secret, store.VerifySSL)
 			if err != nil {
-				c.JSON(http.StatusBadGateway, gin.H{"error": fmt.Sprintf("failed to create webhook on woo: %v", err)})
-				return
+				// Attempt to handle "already exists" scenario
+				// 1. Check if it exists on Woo
+				existingID, findErr := getWooWebhookID(store.SiteURL, ck, cs, topic, deliveryURL, store.VerifySSL)
+				if findErr == nil && existingID != "" {
+					// 2. Delete it
+					if delErr := deleteWooWebhook(store.SiteURL, ck, cs, existingID, store.VerifySSL); delErr == nil {
+						// 3. Retry creation
+						webhookID, err = createWooWebhook(store.SiteURL, ck, cs, deliveryURL, topic, secret, store.VerifySSL)
+					}
+				}
+				
+				// If still error, return it
+				if err != nil {
+					c.JSON(http.StatusBadGateway, gin.H{"error": fmt.Sprintf("failed to create webhook on woo: %v", err)})
+					return
+				}
 			}
 
 			// encrypt secret

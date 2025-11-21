@@ -108,6 +108,8 @@ def call_backend_register_webhooks(store_id, delivery_url=None, topics=None):
 # Message Handler
 # ===========================================================
 
+MAX_RETRIES = 5
+
 def on_message(ch, method, properties, body):
     delivery_tag = method.delivery_tag
     logging.info("📨 Received message")
@@ -118,6 +120,10 @@ def on_message(ch, method, properties, body):
         logging.error("Invalid JSON; rejecting.")
         ch.basic_reject(delivery_tag=delivery_tag, requeue=False)
         return
+
+    # Get retry count from headers
+    headers = properties.headers or {}
+    retry_count = headers.get("x-retry-count", 0)
 
     store_id = msg.get("store_id") or msg.get("payload", {}).get("store_id")
     if not store_id:
@@ -130,31 +136,46 @@ def on_message(ch, method, properties, body):
     # =======================================================
     # 1. Sync Categories
     # =======================================================
-    logging.info(f"🔄 Syncing categories for store_id={store_id}")
+    logging.info(f"🔄 Syncing categories for store_id={store_id} (Attempt {retry_count + 1}/{MAX_RETRIES + 1})")
 
     status, text = call_backend_sync(store_id)
+    
+    # Check for failure conditions that warrant a retry
+    needs_retry = False
     if status == 0:
-        logging.error("sync_categories network error: %s; requeueing", text)
-        ch.basic_nack(delivery_tag=delivery_tag, requeue=True)
-        time.sleep(1)
-        return
-
-    if status == 401 or status == 403:
-        logging.error("sync_categories auth error (%d): %s; rejecting", status, text)
+        logging.error("sync_categories network error: %s", text)
+        needs_retry = True
+    elif status // 100 != 2 and status not in [401, 403, 404]:
+        logging.error("sync_categories failed (%d): %s", status, text)
+        needs_retry = True
+    elif status in [401, 403, 404]:
+        logging.error("sync_categories fatal error (%d): %s; rejecting", status, text)
         ch.basic_reject(delivery_tag=delivery_tag, requeue=False)
         return
 
-    if status == 404:
-        logging.error("sync_categories 404 (store not found): %s; rejecting without requeue", text)
-        ch.basic_reject(delivery_tag=delivery_tag, requeue=False)
+    if needs_retry:
+        if retry_count < MAX_RETRIES:
+            logging.info(f"Requeuing message for retry {retry_count + 1}...")
+            time.sleep(1) # Basic backoff
+            
+            # Publish new message with incremented retry count
+            new_headers = headers.copy()
+            new_headers["x-retry-count"] = retry_count + 1
+            
+            ch.basic_publish(
+                exchange=method.exchange,
+                routing_key=method.routing_key,
+                body=body,
+                properties=pika.BasicProperties(
+                    headers=new_headers,
+                    delivery_mode=2 # Persistent
+                )
+            )
+            ch.basic_ack(delivery_tag=delivery_tag)
+        else:
+            logging.error("❌ Max retries exceeded for sync_categories. Dropping message.")
+            ch.basic_ack(delivery_tag=delivery_tag)
         return
-
-    if status // 100 != 2:
-        logging.error("sync_categories failed (%d): %s; requeueing", status, text)
-        ch.basic_nack(delivery_tag=delivery_tag, requeue=True)
-        time.sleep(1)
-        return
-
 
     logging.info("✅ Category sync complete")
 
@@ -177,28 +198,42 @@ def on_message(ch, method, properties, body):
     ]
 
     status, text = call_backend_register_webhooks(store_id, delivery_url, topics)
+    
+    # Check for failure conditions that warrant a retry
+    needs_retry = False
     if status == 0:
-        logging.error("sync_categories network error: %s; requeueing", text)
-        ch.basic_nack(delivery_tag=delivery_tag, requeue=True)
-        time.sleep(1)
-        return
-
-    if status == 401 or status == 403:
-        logging.error("sync_categories auth error (%d): %s; rejecting", status, text)
+        logging.error("register_webhooks network error: %s", text)
+        needs_retry = True
+    elif status // 100 != 2 and status not in [401, 403, 404]:
+        logging.error("register_webhooks failed (%d): %s", status, text)
+        needs_retry = True
+    elif status in [401, 403, 404]:
+        logging.error("register_webhooks fatal error (%d): %s; rejecting", status, text)
         ch.basic_reject(delivery_tag=delivery_tag, requeue=False)
         return
 
-    if status == 404:
-        logging.error("sync_categories 404 (store not found): %s; rejecting without requeue", text)
-        ch.basic_reject(delivery_tag=delivery_tag, requeue=False)
+    if needs_retry:
+        if retry_count < MAX_RETRIES:
+            logging.info(f"Requeuing message for retry {retry_count + 1}...")
+            time.sleep(1)
+            
+            new_headers = headers.copy()
+            new_headers["x-retry-count"] = retry_count + 1
+            
+            ch.basic_publish(
+                exchange=method.exchange,
+                routing_key=method.routing_key,
+                body=body,
+                properties=pika.BasicProperties(
+                    headers=new_headers,
+                    delivery_mode=2
+                )
+            )
+            ch.basic_ack(delivery_tag=delivery_tag)
+        else:
+            logging.error("❌ Max retries exceeded for register_webhooks. Dropping message.")
+            ch.basic_ack(delivery_tag=delivery_tag)
         return
-
-    if status // 100 != 2:
-        logging.error("sync_categories failed (%d): %s; requeueing", status, text)
-        ch.basic_nack(delivery_tag=delivery_tag, requeue=True)
-        time.sleep(1)
-        return
-
 
     logging.info("✅ Webhooks registered successfully")
     ch.basic_ack(delivery_tag=delivery_tag)

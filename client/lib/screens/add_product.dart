@@ -1,9 +1,10 @@
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:dotted_border/dotted_border.dart';
 import 'package:flutter/foundation.dart'; // Required for Uint8List
+import 'package:provider/provider.dart';
+import '../providers/product_provider.dart';
 import 'add_product_2.dart'; 
 
 
@@ -17,48 +18,72 @@ class AddNewProductScreen extends StatefulWidget {
 class _AddNewProductScreenState extends State<AddNewProductScreen> {
   final _formKey = GlobalKey<FormState>();
 
-  final _nameCtrl = TextEditingController();
-  final _descCtrl = TextEditingController();
-  final _shortdescCtrl = TextEditingController();
-  final _brandCtrl = TextEditingController();
-  final _hsnCtrl = TextEditingController();
-  final _countryCtrl = TextEditingController();
-  final _skuCtrl = TextEditingController();
+  late TextEditingController _nameCtrl;
+  late TextEditingController _descCtrl;
+  late TextEditingController _shortdescCtrl;
+  late TextEditingController _brandCtrl;
+  late TextEditingController _hsnCtrl;
+  late TextEditingController _countryCtrl;
+  late TextEditingController _skuCtrl;
 
   String? _category;
-
-  // Use (path, bytes) tuple instead of File for web compatibility
-  final _images = <(String, Uint8List)>[]; 
   final _picker = ImagePicker();
+
+  @override
+  void initState() {
+    super.initState();
+    final p = context.read<ProductProvider>();
+    _nameCtrl = TextEditingController(text: p.name);
+    _descCtrl = TextEditingController(text: p.description);
+    _shortdescCtrl = TextEditingController(text: p.shortDescription);
+    _brandCtrl = TextEditingController(text: p.brand);
+    _hsnCtrl = TextEditingController(text: p.hsnCode);
+    _countryCtrl = TextEditingController(text: p.countryOfOrigin);
+    _skuCtrl = TextEditingController(text: p.sku);
+    _category = p.category.isNotEmpty ? p.category : null;
+  }
+
+  @override
+  void dispose() {
+    _nameCtrl.dispose();
+    _descCtrl.dispose();
+    _shortdescCtrl.dispose();
+    _brandCtrl.dispose();
+    _hsnCtrl.dispose();
+    _countryCtrl.dispose();
+    _skuCtrl.dispose();
+    super.dispose();
+  }
 
   Future<void> _pickImages() async {
     final picked = await _picker.pickMultiImage(imageQuality: 85);
     if (picked.isEmpty) return;
     
-    // Read bytes for each picked file (required for display on web)
     final byteFutures = picked.map((xFile) => xFile.readAsBytes());
     final bytesList = await Future.wait(byteFutures);
 
-    setState(() {
-      _images.addAll(
-        Iterable.generate(picked.length, (i) => (picked[i].path, bytesList[i])),
-      );
-    });
+    final newImages = Iterable.generate(picked.length, (i) => (picked[i].path, bytesList[i]));
+    
+    if (mounted) {
+      final p = context.read<ProductProvider>();
+      p.setImages([...p.images, ...newImages]);
+    }
   }
 
-  // Function to handle setting an image as primary (moves to index 0)
   void _onSetPrimary(int index) {
     if (index == 0) return;
-    setState(() {
-      final image = _images.removeAt(index);
-      _images.insert(0, image);
-    });
+    final p = context.read<ProductProvider>();
+    final list = List<(String, Uint8List)>.from(p.images);
+    final image = list.removeAt(index);
+    list.insert(0, image);
+    p.setImages(list);
   }
 
   void _onRemove(int index) {
-    setState(() {
-      _images.removeAt(index);
-    });
+    final p = context.read<ProductProvider>();
+    final list = List<(String, Uint8List)>.from(p.images);
+    list.removeAt(index);
+    p.setImages(list);
   }
 
 
@@ -83,26 +108,27 @@ class _AddNewProductScreenState extends State<AddNewProductScreen> {
     if (!_formKey.currentState!.validate()) {
       return;
     }
+    
+    // Save to provider
+    context.read<ProductProvider>().updateCore(
+      name: _nameCtrl.text,
+      shortDescription: _shortdescCtrl.text,
+      description: _descCtrl.text,
+      category: _category,
+      brand: _brandCtrl.text,
+      hsnCode: _hsnCtrl.text,
+      sku: _skuCtrl.text,
+      countryOfOrigin: _countryCtrl.text,
+    );
 
     goToNextStep(const AddProductStep2Screen());
-  }
-
-  @override
-  void dispose() {
-    _nameCtrl.dispose();
-    _descCtrl.dispose();
-    _shortdescCtrl.dispose();
-    _brandCtrl.dispose();
-    _hsnCtrl.dispose();
-    _countryCtrl.dispose();
-    _skuCtrl.dispose();
-    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
+    final provider = context.watch<ProductProvider>();
 
     return Scaffold(
       appBar: AppBar(
@@ -213,7 +239,7 @@ class _AddNewProductScreenState extends State<AddNewProductScreen> {
                       const SizedBox(height: 6),
                       // 🛑 UploadBox now handles the layout to match Figma
                       _UploadBox(
-                        images: _images,
+                        images: provider.images,
                         onAdd: _pickImages,
                         onRemove: _onRemove,
                         onSetPrimary: _onSetPrimary, 

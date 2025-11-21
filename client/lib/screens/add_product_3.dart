@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
+import '../providers/product_provider.dart';
 
 class ChannelsAndPublishingStep extends StatefulWidget {
   const ChannelsAndPublishingStep({super.key});
@@ -10,39 +12,52 @@ class ChannelsAndPublishingStep extends StatefulWidget {
 
 class _ChannelsAndPublishingStepState extends State<ChannelsAndPublishingStep> {
   // Toggles
-  bool wooEnabled = false;
-  bool ondcEnabled = false;
+  late bool wooEnabled;
+  late bool ondcEnabled;
 
   // --- WooCommerce Settings ---
-  // New: Simple product type (non-changeable for this UI)
   final String wooProductType = 'simple';
-  // New: Toggle for custom price
-  bool wooUseCustomPrice = false;
-  final TextEditingController wooCustomPriceCtrl = TextEditingController();
-  // New: Catalog Visibility
-  String wooCatalogVisibility = 'visible'; // visible, catalog, search, hidden
+  late bool wooUseCustomPrice;
+  late TextEditingController wooCustomPriceCtrl;
+  late String wooCatalogVisibility;
  
 
   // --- ONDC Settings ---
-  // New: Toggles for returnable/cancellable
-  bool ondcReturnable = true;
-  bool ondcCancellable = true;
-  // New: Toggle for custom price
-  bool ondcUseCustomPrice = false;
-  final TextEditingController ondcCustomPriceCtrl = TextEditingController();
-  final TextEditingController ondcWarrantyCtrl = TextEditingController(); // Optional
-  // New: Fulfillment Type (delivery / pickup / both)
+  late bool ondcReturnable;
+  late bool ondcCancellable;
+  late bool ondcUseCustomPrice;
+  late TextEditingController ondcCustomPriceCtrl;
+  late TextEditingController ondcWarrantyCtrl;
   String? ondcFulfillmentType;
-  // New: Fulfillment Time to Ship (ISO duration)
-  final TextEditingController ondcTimeToShipCtrl = TextEditingController(); // e.g., P1D or PT24H
-  // New: City Code
-  final TextEditingController ondcCityCodeCtrl = TextEditingController();
-  // New: Location ID (Simplified for UI, usually a Multi-Select or complex logic)
+  late TextEditingController ondcTimeToShipCtrl;
+  late TextEditingController ondcCityCodeCtrl;
   String? ondcLocationId;
-  String? ondcCategory; // e.g., Grocery, Fashion, Electronics
-  String? ondcFulfillment; // Hyperlocal / Intercity
+  
+  // Unused in provider but present in UI
   final TextEditingController ondcReturnWindowDaysCtrl = TextEditingController();
   final TextEditingController ondcMaxDispatchHrsCtrl = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    final p = context.read<ProductProvider>();
+    
+    wooEnabled = p.wooEnabled;
+    wooUseCustomPrice = p.wooUseCustomPrice;
+    wooCustomPriceCtrl = TextEditingController(text: p.wooCustomPrice?.toString() ?? '');
+    wooCatalogVisibility = p.wooCatalogVisibility;
+
+    ondcEnabled = p.ondcEnabled;
+    ondcReturnable = p.ondcReturnable;
+    ondcCancellable = p.ondcCancellable;
+    ondcUseCustomPrice = p.ondcUseCustomPrice;
+    ondcCustomPriceCtrl = TextEditingController(text: p.ondcCustomPrice?.toString() ?? '');
+    ondcWarrantyCtrl = TextEditingController(text: p.ondcWarranty);
+    ondcFulfillmentType = p.ondcFulfillmentType;
+    ondcTimeToShipCtrl = TextEditingController(text: p.ondcTimeToShip);
+    ondcCityCodeCtrl = TextEditingController(text: p.ondcCityCode);
+    ondcLocationId = p.ondcLocationId;
+  }
 
   @override
   void dispose() {
@@ -60,41 +75,31 @@ class _ChannelsAndPublishingStepState extends State<ChannelsAndPublishingStep> {
   int get selectedCount => [wooEnabled, ondcEnabled].where((e) => e).length;
 
   void _saveAndPublish() {
-    // Collect all data for publishing
-    final wooData = {
-      'enabled': wooEnabled,
-      'product_type': wooProductType,
-      'custom_price_enabled': wooUseCustomPrice,
-      'custom_price': wooUseCustomPrice ? wooCustomPriceCtrl.text : null,
-      'catalog_visibility': wooCatalogVisibility,
-    };
-
-    final ondcData = {
-      'enabled': ondcEnabled,
-      'returnable': ondcReturnable,
-      'cancellable': ondcCancellable,
-      'custom_price_enabled': ondcUseCustomPrice,
-      'custom_price': ondcUseCustomPrice ? ondcCustomPriceCtrl.text : null,
-      'warranty': ondcWarrantyCtrl.text.isNotEmpty ? ondcWarrantyCtrl.text : null,
-      'fulfillment_type': ondcFulfillmentType,
-      'time_to_ship': ondcTimeToShipCtrl.text,
-      'city_code': ondcCityCodeCtrl.text,
-      'location_id': ondcLocationId,
-      'category': ondcCategory,
-      // Existing ONDC fields (kept for context, but new fields take precedence in a real system)
-      'ondcFulfillment': ondcFulfillment,
-      'return_window_days': ondcReturnWindowDaysCtrl.text,
-      'max_dispatch_hours': ondcMaxDispatchHrsCtrl.text,
-    };
-
-    // Print or process the data
-    debugPrint('WooCommerce Data: $wooData');
-    debugPrint('ONDC Data: $ondcData');
-
-    // Validate nothing heavy here; you can add per-channel validations if required.
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Publishing to $selectedCount channel(s) with custom settings…')),
+    // Update provider with latest values
+    final p = context.read<ProductProvider>();
+    
+    p.updateWoo(
+      enabled: wooEnabled,
+      useCustomPrice: wooUseCustomPrice,
+      customPrice: double.tryParse(wooCustomPriceCtrl.text),
+      catalogVisibility: wooCatalogVisibility,
     );
+
+    p.updateOndc(
+      enabled: ondcEnabled,
+      returnable: ondcReturnable,
+      cancellable: ondcCancellable,
+      useCustomPrice: ondcUseCustomPrice,
+      customPrice: double.tryParse(ondcCustomPriceCtrl.text),
+      fulfillmentType: ondcFulfillmentType,
+      timeToShip: ondcTimeToShipCtrl.text,
+      cityCode: ondcCityCodeCtrl.text,
+      locationId: ondcLocationId,
+      warranty: ondcWarrantyCtrl.text,
+    );
+
+    // Call submit
+    p.submit(context);
   }
 
   // ---------- Bottom Sheets ----------

@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/RvShivam/inventify/internal/db"
@@ -86,7 +87,10 @@ func main() {
 	// CORS config — allow your dev frontend origin and required headers
 	config := cors.Config{
 		// Change this to the exact origin(s) your frontend uses in dev
-		AllowOrigins:     []string{"http://localhost:56705"},
+		AllowOriginFunc: func(origin string) bool {
+			// This allows any connection from localhost, regardless of port
+			return strings.HasPrefix(origin, "http://localhost")
+		},
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization", "X-Organization-Id"},
 		ExposeHeaders:    []string{"Content-Length"},
@@ -118,6 +122,7 @@ func main() {
 		}
 
 		// add other protected routes like /products here
+		api.POST("/products", handlers.CreateProduct(dbconn))
 	}
 
 	// internal service-only endpoints (protected by SERVICE_TOKEN)

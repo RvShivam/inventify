@@ -1,6 +1,8 @@
 // add_product_step2_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
+import '../providers/product_provider.dart';
 import 'add_product_3.dart';
 
 class AddProductStep2Screen extends StatefulWidget {
@@ -13,15 +15,26 @@ class AddProductStep2Screen extends StatefulWidget {
 class _AddProductStep2ScreenState extends State<AddProductStep2Screen> {
   final _formKey = GlobalKey<FormState>();
 
-  
-  final _mrpCtrl = TextEditingController();
-  final _compareAtCtrl = TextEditingController();
-  final _stockCtrl = TextEditingController();
-  final _lenCtrl = TextEditingController();
-  final _weightCtrl = TextEditingController();
-  final _heigCtrl = TextEditingController();
-  final _widCtrl = TextEditingController();
+  late TextEditingController _mrpCtrl;
+  late TextEditingController _compareAtCtrl;
+  late TextEditingController _stockCtrl;
+  late TextEditingController _lenCtrl;
+  late TextEditingController _weightCtrl;
+  late TextEditingController _heigCtrl;
+  late TextEditingController _widCtrl;
 
+  @override
+  void initState() {
+    super.initState();
+    final p = context.read<ProductProvider>();
+    _mrpCtrl = TextEditingController(text: p.regularPrice > 0 ? p.regularPrice.toString() : '');
+    _compareAtCtrl = TextEditingController(text: p.salePrice?.toString() ?? '');
+    _stockCtrl = TextEditingController(text: p.stockQuantity > 0 ? p.stockQuantity.toString() : '');
+    _lenCtrl = TextEditingController(text: p.lengthCm?.toString() ?? '');
+    _weightCtrl = TextEditingController(text: p.weightKg?.toString() ?? '');
+    _heigCtrl = TextEditingController(text: p.heightCm?.toString() ?? '');
+    _widCtrl = TextEditingController(text: p.widthCm?.toString() ?? '');
+  }
 
   @override
   void dispose() {
@@ -37,7 +50,17 @@ class _AddProductStep2ScreenState extends State<AddProductStep2Screen> {
 
   void _goNext() {
     if (_formKey.currentState!.validate()) {
-      
+      // Save to provider
+      context.read<ProductProvider>().updatePricing(
+        regularPrice: double.tryParse(_mrpCtrl.text),
+        salePrice: double.tryParse(_compareAtCtrl.text),
+        stockQuantity: int.tryParse(_stockCtrl.text),
+        lengthCm: double.tryParse(_lenCtrl.text),
+        weightKg: double.tryParse(_weightCtrl.text),
+        heightCm: double.tryParse(_heigCtrl.text),
+        widthCm: double.tryParse(_widCtrl.text),
+      );
+
        Navigator.push(context, MaterialPageRoute(builder: (_) => const ChannelsAndPublishingStep()));
     }
   }

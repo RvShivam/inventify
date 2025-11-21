@@ -351,6 +351,75 @@ func createWooWebhook(site, consumerKey, consumerSecret, deliveryURL, topic, sec
 	return "", errors.New("no id in webhook response")
 }
 
+// getWooWebhookID finds a webhook by topic and delivery_url
+func getWooWebhookID(site, consumerKey, consumerSecret, topic, deliveryURL string, verifySSL bool) (string, error) {
+	// List webhooks (filtering by topic if possible, but Woo V3 doesn't always support strict filtering by topic in list, so we might need to fetch all or filter manually)
+	// V3 supports ?status=active etc. Let's just fetch all (default 10) or increase limit.
+	// Better: ?topic=... is supported in some versions. Let's try listing.
+	url := fmt.Sprintf("%s/wp-json/wc/v3/webhooks?per_page=100", strings.TrimRight(site, "/"))
+	req, _ := http.NewRequest("GET", url, nil)
+	req.SetBasicAuth(consumerKey, consumerSecret)
+
+	client := &http.Client{Timeout: 15 * time.Second}
+	if !verifySSL {
+		tr := &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		}
+		client.Transport = tr
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		return "", fmt.Errorf("failed to list webhooks: %d", resp.StatusCode)
+	}
+
+	var webhooks []map[string]interface{}
+	if err := json.NewDecoder(resp.Body).Decode(&webhooks); err != nil {
+		return "", err
+	}
+
+	for _, wh := range webhooks {
+		t, _ := wh["topic"].(string)
+		d, _ := wh["delivery_url"].(string)
+		if t == topic && d == deliveryURL {
+			if id, ok := wh["id"]; ok {
+				return fmt.Sprintf("%v", id), nil
+			}
+		}
+	}
+	return "", nil // not found
+}
+
+// deleteWooWebhook deletes a webhook by ID
+func deleteWooWebhook(site, consumerKey, consumerSecret, webhookID string, verifySSL bool) error {
+	url := fmt.Sprintf("%s/wp-json/wc/v3/webhooks/%s?force=true", strings.TrimRight(site, "/"), webhookID)
+	req, _ := http.NewRequest("DELETE", url, nil)
+	req.SetBasicAuth(consumerKey, consumerSecret)
+
+	client := &http.Client{Timeout: 15 * time.Second}
+	if !verifySSL {
+		tr := &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		}
+		client.Transport = tr
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 && resp.StatusCode != 204 { // 200 or 204 is success
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("failed to delete webhook %s: %d %s", webhookID, resp.StatusCode, string(body))
+	}
+	return nil
+}
+
 // randomSecret returns a url-safe base64-like secret (hex)
 func randomSecret(n int) string {
 	b := make([]byte, n)
