@@ -56,6 +56,7 @@ func main() {
 		&models.ChannelPublishLog{},
 		&models.WooStore{},
 		&models.WooStoreWebhook{},
+		&models.Order{},
 	); err != nil {
 		log.Fatal("AutoMigrate failed: ", err)
 	}
@@ -80,6 +81,9 @@ func main() {
 			log.Println("events.Close error:", err)
 		}
 	}()
+
+	// Start Consumers
+	events.StartOrderConsumer(dbconn)
 
 	// Router & routes
 	router := gin.Default()
@@ -111,6 +115,7 @@ func main() {
 	api := router.Group("/api")
 	api.Use(middleware.RequireAuth)
 	{
+		api.GET("/me", handlers.GetProfile(dbconn))
 		api.GET("/dashboard", handlers.GetDashboard(dbconn))
 
 		// Woo store management
@@ -123,6 +128,10 @@ func main() {
 
 		// add other protected routes like /products here
 		api.POST("/products", handlers.CreateProduct(dbconn))
+
+		// Organization management
+		api.GET("/organization", handlers.GetOrganization(dbconn))
+		api.POST("/organization/referral_code", handlers.RegenerateReferralCode(dbconn))
 	}
 
 	// internal service-only endpoints (protected by SERVICE_TOKEN)
@@ -131,6 +140,7 @@ func main() {
 	{
 		internal.POST("/woo/stores/:id/sync_categories", handlers.SyncWooCategories(dbconn))
 		internal.POST("/woo/stores/:id/register_webhooks", handlers.InternalRegisterWebhooks(dbconn))
+		internal.POST("/products/:id/sync_woo", handlers.SyncProductToWooInternal(dbconn))
 	}
 
 	log.Println("Starting server on port 8080...")

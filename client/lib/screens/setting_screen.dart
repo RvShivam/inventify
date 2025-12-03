@@ -1,10 +1,101 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:inventify/screens/login_screen.dart';
+import 'package:inventify/services/auth_service.dart';
+import 'package:inventify/services/organization_service.dart';
+import 'package:inventify/services/token_store.dart';
 
-class SettingsScreen extends StatelessWidget {
+class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
+
+  @override
+  State<SettingsScreen> createState() => _SettingsScreenState();
+}
+
+class _SettingsScreenState extends State<SettingsScreen> {
+  final _orgService = OrganizationService();
+  final _authService = AuthService();
+  bool _isLoading = true;
+  Map<String, dynamic>? _orgData;
+  Map<String, dynamic>? _userData;
+  bool _isAdmin = false;
+  String? _errorMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchData();
+  }
+
+  Future<void> _fetchData() async {
+    setState(() => _isLoading = true);
+    try {
+      final org = await _orgService.getOrganization();
+      final user = await _authService.getProfile();
+      final roleId = await TokenStore.getRoleId();
+      
+      if (mounted) {
+        setState(() {
+          _orgData = org;
+          _userData = user;
+          _isAdmin = roleId == 1; // Assuming 1 is Admin
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _errorMessage = e.toString();
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _regenerateCode() async {
+    if (!_isAdmin) return;
+
+    try {
+      final newCode = await _orgService.regenerateReferralCode();
+      setState(() {
+        _orgData?['referralCode'] = newCode;
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Referral code updated')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to update code: $e')),
+        );
+      }
+    }
+  }
+
+  void _copyCode() {
+    final code = _orgData?['referralCode'];
+    if (code != null) {
+      Clipboard.setData(ClipboardData(text: code));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Code copied to clipboard')),
+      );
+    }
+  }
 
   void _open(BuildContext context, String name) {
     // Navigation or dialog logic can go here
+  }
+
+  Future<void> _logout() async {
+    await _authService.logout();
+    if (mounted) {
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const LoginScreen()),
+        (route) => false,
+      );
+    }
   }
 
   @override
@@ -98,6 +189,10 @@ class SettingsScreen extends StatelessWidget {
       );
     }
 
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
     return SafeArea(
       top: false, // since your AppBar is outside this screen
       child: ListView(
@@ -120,7 +215,9 @@ class SettingsScreen extends StatelessWidget {
                     child: CircleAvatar(
                       backgroundColor: Colors.transparent,
                       child: Text(
-                        'JD',
+                        (_userData?['name'] as String?)?.isNotEmpty == true
+                            ? (_userData!['name'] as String).substring(0, 1).toUpperCase()
+                            : 'U',
                         style: t.titleMedium?.copyWith(
                           color: cs.primary,
                           fontWeight: FontWeight.w800,
@@ -133,10 +230,10 @@ class SettingsScreen extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('John Doe',
+                        Text(_userData?['name'] ?? 'User',
                             style: t.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
                         const SizedBox(height: 4),
-                        Text('john.doe@example.com',
+                        Text(_userData?['email'] ?? '',
                             style: t.bodySmall?.copyWith(color: cs.onSurface.withOpacity(.7))),
                       ],
                     ),
@@ -151,6 +248,106 @@ class SettingsScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 18),
+
+          // Staff Invitation Section
+          sectionHeader('Staff Invitation'),
+          panel(
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: cs.primary.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Icon(Icons.person_add_alt_1_rounded, color: cs.primary, size: 20),
+                      ),
+                      const SizedBox(width: 12),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Invitation Code',
+                            style: t.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+                          ),
+                          Text(
+                            '${_orgData?['memberCount'] ?? 0} staff members connected',
+                            style: t.bodySmall?.copyWith(color: cs.onSurface.withOpacity(0.7)),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  Text('Code', style: t.labelMedium?.copyWith(fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: cs.outlineVariant.withOpacity(0.3)),
+                      borderRadius: BorderRadius.circular(8),
+                      color: cs.surface,
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.group_outlined, size: 20, color: cs.primary),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            _orgData?['referralCode'] ?? 'N/A',
+                            style: t.bodyLarge?.copyWith(fontWeight: FontWeight.w600, letterSpacing: 0.5),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: _isAdmin ? _regenerateCode : null,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: cs.primary,
+                            foregroundColor: cs.onPrimary,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            elevation: 0,
+                          ),
+                          child: const Text('Generate New Code'),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      IconButton(
+                        onPressed: _copyCode,
+                        icon: const Icon(Icons.copy_rounded),
+                        style: IconButton.styleFrom(
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            side: BorderSide(color: cs.outlineVariant.withOpacity(0.3)),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (!_isAdmin)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8.0),
+                      child: Text(
+                        'Only admins can generate new codes',
+                        style: t.bodySmall?.copyWith(color: cs.error),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
 
           // Account Section
           sectionHeader('Account'),
@@ -227,9 +424,7 @@ class SettingsScreen extends StatelessWidget {
                       TextButton(
                         onPressed: () {
                           Navigator.of(c).pop();
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Signed out (demo)')),
-                          );
+                          _logout();
                         },
                         child: const Text(
                           'Sign out',

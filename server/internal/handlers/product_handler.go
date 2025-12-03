@@ -6,11 +6,13 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
+	"github.com/RvShivam/inventify/internal/events"
 	"github.com/RvShivam/inventify/internal/models"
 )
 
@@ -24,6 +26,13 @@ func CreateProduct(db *gorm.DB) gin.HandlerFunc {
 		// Limit upload size to 32MB
 		if err := c.Request.ParseMultipartForm(32 << 20); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to parse multipart form"})
+			return
+		}
+
+		// Get Org ID
+		orgID, ok := getOrgIDFromContext(c)
+		if !ok {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized: No organization found"})
 			return
 		}
 
@@ -100,8 +109,8 @@ func CreateProduct(db *gorm.DB) gin.HandlerFunc {
 
 		// Create Product
 		product := models.Product{
-			OrganizationID: 1, // Hardcoded for now, or get from auth context
-			Name:           req.Name,
+			OrganizationID:   orgID,
+			Name:             req.Name,
 			ShortDescription: req.ShortDescription,
 			Description:      req.Description,
 			SKU:              req.SKU,
@@ -155,11 +164,11 @@ func CreateProduct(db *gorm.DB) gin.HandlerFunc {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save WooCommerce settings"})
 				return
 			}
-			
+
 			// Also add to ProductChannels
 			// Find Woo Channel ID (assuming it exists)
 			var wooChannel models.Channel
-			if err := tx.Where("name = ? AND organization_id = ?", "woocommerce", 1).First(&wooChannel).Error; err == nil {
+			if err := tx.Where("name = ? AND organization_id = ?", "woocommerce", orgID).First(&wooChannel).Error; err == nil {
 				pc := models.ProductChannel{
 					ProductID: product.ID,
 					ChannelID: wooChannel.ID,
@@ -188,7 +197,7 @@ func CreateProduct(db *gorm.DB) gin.HandlerFunc {
 
 			// Also add to ProductChannels
 			var ondcChannel models.Channel
-			if err := tx.Where("name = ? AND organization_id = ?", "ondc", 1).First(&ondcChannel).Error; err == nil {
+			if err := tx.Where("name = ? AND organization_id = ?", "ondc", orgID).First(&ondcChannel).Error; err == nil {
 				pc := models.ProductChannel{
 					ProductID: product.ID,
 					ChannelID: ondcChannel.ID,
@@ -199,28 +208,45 @@ func CreateProduct(db *gorm.DB) gin.HandlerFunc {
 		}
 
 		tx.Commit()
+
+		// Publish Event
+		go func() {
+			ev := events.ProductCreatedEvent{
+				BaseEvent: events.BaseEvent{
+					Event:     events.RoutingKeyProductCreated,
+					Version:   1,
+					Timestamp: time.Now().UTC(),
+				},
+				ProductID:      product.ID,
+				OrganizationID: product.OrganizationID,
+			}
+			if err := events.Publish(events.RoutingKeyProductCreated, ev); err != nil {
+				fmt.Printf("Failed to publish product.created event: %v\n", err)
+			}
+		}()
+
 		c.JSON(http.StatusCreated, gin.H{"message": "Product created successfully", "id": product.ID})
 	}
 }
 
 type createProductReq struct {
-	Name             string   `json:"name"`
-	ShortDescription string   `json:"short_description"`
-	Description      string   `json:"description"`
-	SKU              string   `json:"sku"`
-	Brand            string   `json:"brand"`
-	HSNCode          string   `json:"hsn_code"`
-	CountryOfOrigin  string   `json:"country_of_origin"`
-	CategoryName     string   `json:"category_name"`
-	
-	RegularPrice     float64  `json:"regular_price"`
-	SalePrice        *float64 `json:"sale_price"`
-	StockQuantity    int      `json:"stock_quantity"`
-	
-	WeightKg         *float64 `json:"weight_kg"`
-	LengthCm         *float64 `json:"length_cm"`
-	WidthCm          *float64 `json:"width_cm"`
-	HeightCm         *float64 `json:"height_cm"`
+	Name             string `json:"name"`
+	ShortDescription string `json:"short_description"`
+	Description      string `json:"description"`
+	SKU              string `json:"sku"`
+	Brand            string `json:"brand"`
+	HSNCode          string `json:"hsn_code"`
+	CountryOfOrigin  string `json:"country_of_origin"`
+	CategoryName     string `json:"category_name"`
+
+	RegularPrice  float64  `json:"regular_price"`
+	SalePrice     *float64 `json:"sale_price"`
+	StockQuantity int      `json:"stock_quantity"`
+
+	WeightKg *float64 `json:"weight_kg"`
+	LengthCm *float64 `json:"length_cm"`
+	WidthCm  *float64 `json:"width_cm"`
+	HeightCm *float64 `json:"height_cm"`
 
 	Woo  *wooSettings  `json:"woo"`
 	ONDC *ondcSettings `json:"ondc"`

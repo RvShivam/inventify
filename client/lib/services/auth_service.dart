@@ -106,6 +106,25 @@ class AuthService {
     }
   }
 
+  Future<Map<String, dynamic>> getProfile() async {
+    final token = await TokenStore.getToken();
+    if (token == null) throw Exception('No token found');
+
+    final resp = await http.get(
+      _uri('/api/me'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+    );
+
+    if (resp.statusCode == 200) {
+      return jsonDecode(resp.body);
+    }
+
+    throw Exception('Failed to fetch profile (${resp.statusCode})');
+  }
+
   Future<void> logout() async {
     await TokenStore.clear();
   }

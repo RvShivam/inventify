@@ -1,16 +1,35 @@
-# project
+# Inventify Client
 
-A new Flutter project.
+The frontend application for Inventify, built with Flutter.
 
-## Getting Started
+## Features
 
-This project is a starting point for a Flutter application.
+- **Product Management**: Add, edit, and view products.
+- **Settings**: Configure store settings and user profile.
+- **Responsive Design**: Works on Mobile and Web.
 
-A few resources to get you started if this is your first Flutter project:
+## Setup
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+1.  **Install Flutter**: Follow instructions at [flutter.dev](https://flutter.dev/docs/get-started/install).
+2.  **Dependencies**:
+    ```bash
+    flutter pub get
+    ```
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+## Running
+
+### Development
+```bash
+flutter run
+```
+
+### Build
+```bash
+flutter build apk
+# or
+flutter build web
+```
+
+## Configuration
+
+Update `lib/config.dart` or equivalent constants file to point to your local server URL (e.g., `http://localhost:8080` or your machine's IP if running on a real device).

@@ -59,12 +59,27 @@ func WooWebhookReceiver(db *gorm.DB) gin.HandlerFunc {
 			// Build the full request URL (scheme + host + path)
 			reqURL := getRequestPublicURL(c)
 			if reqURL != "" {
+				// 1. Try exact match
 				if err := db.Where("delivery_url = ?", reqURL).First(&ws).Error; err == nil {
 					found = true
 				} else if !errors.Is(err, gorm.ErrRecordNotFound) {
 					log.Println("woo webhook receiver: db error lookup by delivery_url:", err)
 					c.JSON(http.StatusInternalServerError, gin.H{"error": "db error"})
 					return
+				}
+
+				// 2. If not found, try matching without scheme (http vs https issues)
+				if !found {
+					// Strip scheme from reqURL
+					reqNoScheme := reqURL
+					if idx := strings.Index(reqURL, "://"); idx >= 0 {
+						reqNoScheme = reqURL[idx+3:]
+					}
+					// Search for delivery_url ending with this host+path
+					// This is a bit loose but safe enough if secrets are verified
+					if err := db.Where("delivery_url LIKE ?", "%://"+reqNoScheme).First(&ws).Error; err == nil {
+						found = true
+					}
 				}
 			}
 		}

@@ -128,6 +128,9 @@ func CreateWooStore(db *gorm.DB) gin.HandlerFunc {
 			return
 		}
 
+		// Ensure the "woocommerce" channel exists for this org
+		go ensureWooChannel(db, orgID)
+
 		// Publish RabbitMQ event (non-blocking; log if fails)
 		go func() {
 			ev := events.WooStoreConnectedEvent{
@@ -196,6 +199,9 @@ func TestWooStore(db *gorm.DB) gin.HandlerFunc {
 		now := time.Now()
 		store.LastSyncedAt = &now
 		_ = db.Save(&store)
+
+		// Ensure the "woocommerce" channel exists (self-healing)
+		go ensureWooChannel(db, store.OrganizationID)
 
 		c.JSON(http.StatusOK, gin.H{"ok": true})
 	}
@@ -486,5 +492,27 @@ func makeUniqueStoreName(db *gorm.DB, orgID uint, base string) (string, error) {
 		}
 		suffix++
 		name = base + "-" + strconv.Itoa(suffix)
+	}
+}
+
+// ensureWooChannel ensures that a "woocommerce" channel exists for the organization.
+func ensureWooChannel(db *gorm.DB, orgID uint) {
+	var count int64
+	if err := db.Model(&models.Channel{}).Where("organization_id = ? AND name = ?", orgID, "woocommerce").Count(&count).Error; err != nil {
+		log.Printf("Error checking for woocommerce channel: %v", err)
+		return
+	}
+	if count == 0 {
+		channel := models.Channel{
+			OrganizationID: orgID,
+			Name:           "woocommerce",
+			Type:           "ecommerce",
+			IsActive:       true,
+		}
+		if err := db.Create(&channel).Error; err != nil {
+			log.Printf("Error creating woocommerce channel: %v", err)
+		} else {
+			log.Printf("Created 'woocommerce' channel for org %d", orgID)
+		}
 	}
 }
