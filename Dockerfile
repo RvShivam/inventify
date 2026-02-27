@@ -1,39 +1,40 @@
-# Start from the official Golang image to build our application.
-FROM golang:1.24.6-alpine AS builder
+# ── Stage 1: Build ──────────────────────────────────────────
+FROM golang:1.24-alpine AS builder
 
-# Set the current working directory inside the container.
+RUN apk add --no-cache git
+
 WORKDIR /app
 
-# Copy go mod and sum files.
-# Since we wiped the directory, these might not exist yet, 
-# but this is the standard setup for when we init the go module.
-COPY go.mod go.sum* ./
+# Copy dependency files first for better layer caching
+COPY server/go.mod server/go.sum ./
+RUN go mod download
 
-# Download all dependencies. Dependencies will be cached if the go.mod and go.sum files are not changed.
-RUN if [ -f go.mod ]; then go mod download; fi
+# Copy the rest of the source code
+COPY server/ .
 
-# Copy the source code into the container.
-COPY . .
+# Build a statically linked binary
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /app/main ./cmd/api/main.go
 
-# Build the Go app. (Assuming our entrypoint will be cmd/api/main.go)
-# We use CGO_ENABLED=0 to ensure a statically linked binary.
-RUN CGO_ENABLED=0 GOOS=linux go build -o main ./cmd/api/main.go || echo "No main.go found yet. Skipping build for now."
+# ── Stage 2: Runtime ────────────────────────────────────────
+FROM alpine:3.19
 
-# Start a new, final stage from a minimal alpine image.
-FROM alpine:latest  
+RUN apk add --no-cache ca-certificates tzdata
 
-# Add maintainer info
 LABEL maintainer="Inventify Team"
 
-WORKDIR /root/
+WORKDIR /app
 
-# Copy the Pre-built binary file from the previous stage.
-# If it failed to build because we haven't written it yet, this will just be skipped or fail during image build, 
-# but it's ready for when we do write it.
-COPY --from=builder /app/main . || true
+# Copy the compiled binary from builder
+COPY --from=builder /app/main .
 
-# Copy the environment variables file if it exists
-COPY .env* ./
+# Expose the default API port
+EXPOSE 8080
 
-# Command to run the executable
+# Run as non-root user for security
+RUN adduser -D -g '' appuser
+USER appuser
+
+# Environment variables should be injected at runtime via
+# docker-compose.yml or `docker run -e`, NOT baked into the image.
+
 CMD ["./main"]
