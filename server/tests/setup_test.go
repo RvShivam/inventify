@@ -35,7 +35,7 @@ func SetupTestEnv(t *testing.T) *TestEnv {
 
 	cfg := &config.Config{
 		Port:               "8080",
-		DBDSN:              "postgres://postgres:postgres@localhost:5432/inventify_test?sslmode=disable",
+		DBDSN:              "host=127.0.0.1 port=5433 user=postgres password=postgres dbname=inventify_test sslmode=disable",
 		JWTSecret:          "test-secret-key-for-tests-only",
 		AccessTokenExpiry:  15 * 60 * 1e9,  // 15 min as duration
 		RefreshTokenExpiry: 7 * 24 * 3600 * 1e9, // 7 days as duration
