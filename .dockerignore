@@ -1,0 +1,37 @@
+# Git
+.git
+.gitignore
+
+# Docker
+.docker
+docker-compose.yml
+docker-compose.*.yml
+
+# IDEs
+.idea
+.vscode
+
+# Python / Node (Legacy cleanup)
+workers/venv/
+__pycache__/
+*.py[cod]
+*$py.class
+node_modules/
+dist/
+
+# Local Data
+.env
+uploads/
+postgres-data/
+db-data/
+rabbitmq-data/
+
+# Build artifacts
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+main
